@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package >
+  <metadata>
+    <id>UwpHmiToolkit</id>
+    <version>0.1.0-test</version>
+    <title>UwpHmiToolkit</title>
+    <authors>T.H. Lim</authors>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <license type="expression">MIT</license>
+    <projectUrl>https://github.com/ZYMechtro/UwpHmiToolkit</projectUrl>
+    <icon>images\ZymPackageIcon.PNG</icon>
+    <description>UwpHmiToolkit</description>
+    <releaseNotes>ReleaseNotes</releaseNotes>
+    <copyright>ZYMechtro</copyright>
+    <tags></tags>
+  </metadata>
+
+  <files>
+    <!-- WinMd and IntelliSense -->
+    <file src="bin\Debug\UwpHmiToolkit.winmd" target="lib\uap10.0"/>
+    <file src="bin\Debug\UwpHmiToolkit.xml" target="lib\uap10.0"/>
+
+    <!-- XAML controls -->
+    <!--<file src="Themes\Generic.xaml" target="lib\uap10.0\Themes"/>-->
+
+    <!-- WINMDs and resources -->
+    <file src="bin\x64\Debug\UwpHmiToolkit.winmd" target="runtimes\win10-x64"/>
+    <file src="bin\x64\Debug\UwpHmiToolkit.pri" target="runtimes\win10-x64"/>
+
+    <file src=".\Images\ZymPackageIcon.PNG" target="images\" />
+
+  </files>
+  
+</package>
