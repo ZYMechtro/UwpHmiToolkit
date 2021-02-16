@@ -1,0 +1,49 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.31005.135
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UwpHmiToolkit", "UwpHmiToolkit\UwpHmiToolkit.csproj", "{F136A573-D4BC-477D-A796-D565F7147584}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Debug|ARM = Debug|ARM
+		Debug|ARM64 = Debug|ARM64
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|Any CPU = Release|Any CPU
+		Release|ARM = Release|ARM
+		Release|ARM64 = Release|ARM64
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{F136A573-D4BC-477D-A796-D565F7147584}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F136A573-D4BC-477D-A796-D565F7147584}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F136A573-D4BC-477D-A796-D565F7147584}.Debug|ARM.ActiveCfg = Debug|ARM
+		{F136A573-D4BC-477D-A796-D565F7147584}.Debug|ARM.Build.0 = Debug|ARM
+		{F136A573-D4BC-477D-A796-D565F7147584}.Debug|ARM64.ActiveCfg = Debug|ARM64
+		{F136A573-D4BC-477D-A796-D565F7147584}.Debug|ARM64.Build.0 = Debug|ARM64
+		{F136A573-D4BC-477D-A796-D565F7147584}.Debug|x64.ActiveCfg = Debug|x64
+		{F136A573-D4BC-477D-A796-D565F7147584}.Debug|x64.Build.0 = Debug|x64
+		{F136A573-D4BC-477D-A796-D565F7147584}.Debug|x86.ActiveCfg = Debug|x86
+		{F136A573-D4BC-477D-A796-D565F7147584}.Debug|x86.Build.0 = Debug|x86
+		{F136A573-D4BC-477D-A796-D565F7147584}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F136A573-D4BC-477D-A796-D565F7147584}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F136A573-D4BC-477D-A796-D565F7147584}.Release|ARM.ActiveCfg = Release|ARM
+		{F136A573-D4BC-477D-A796-D565F7147584}.Release|ARM.Build.0 = Release|ARM
+		{F136A573-D4BC-477D-A796-D565F7147584}.Release|ARM64.ActiveCfg = Release|ARM64
+		{F136A573-D4BC-477D-A796-D565F7147584}.Release|ARM64.Build.0 = Release|ARM64
+		{F136A573-D4BC-477D-A796-D565F7147584}.Release|x64.ActiveCfg = Release|x64
+		{F136A573-D4BC-477D-A796-D565F7147584}.Release|x64.Build.0 = Release|x64
+		{F136A573-D4BC-477D-A796-D565F7147584}.Release|x86.ActiveCfg = Release|x86
+		{F136A573-D4BC-477D-A796-D565F7147584}.Release|x86.Build.0 = Release|x86
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {9DC63285-48C1-4E3A-A2B9-FFB995E993DE}
+	EndGlobalSection
+EndGlobal
