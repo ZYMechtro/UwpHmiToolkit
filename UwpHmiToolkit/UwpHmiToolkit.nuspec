@@ -13,19 +13,22 @@
     <releaseNotes>ReleaseNotes</releaseNotes>
     <copyright>ZYMechtro</copyright>
     <tags></tags>
+    <dependencies>
+      <group targetFramework="UAP10.0" />
+    </dependencies>
   </metadata>
 
   <files>
     <!-- WinMd and IntelliSense -->
-    <file src="bin\Debug\UwpHmiToolkit.winmd" target="lib\uap10.0"/>
-    <file src="bin\Debug\UwpHmiToolkit.xml" target="lib\uap10.0"/>
-
-    <!-- XAML controls -->
-    <!--<file src="Themes\Generic.xaml" target="lib\uap10.0\Themes"/>-->
+    <file src="bin\Release\UwpHmiToolkit.winmd" target="lib\uap10.0"/>
+    <file src="bin\Release\UwpHmiToolkit.xml" target="lib\uap10.0"/>
 
     <!-- WINMDs and resources -->
-    <file src="bin\x64\Debug\UwpHmiToolkit.winmd" target="runtimes\win10-x64"/>
-    <file src="bin\x64\Debug\UwpHmiToolkit.pri" target="runtimes\win10-x64"/>
+    <file src="bin\x64\Release\UwpHmiToolkit.winmd" target="runtimes\win10-x64"/>
+    <file src="bin\x64\Release\UwpHmiToolkit.pri" target="runtimes\win10-x64"/>
+
+    <file src="bin\x86\Release\UwpHmiToolkit.winmd" target="runtimes\win10-x86"/>
+    <file src="bin\x86\Release\UwpHmiToolkit.pri" target="runtimes\win10-x86"/>
 
     <file src=".\Images\ZymPackageIcon.PNG" target="images\" />
 
