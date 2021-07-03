@@ -1,143 +1,265 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
 using UwpHmiToolkit.ViewModel;
 using Windows.Networking;
+using Windows.Networking.Connectivity;
+using Windows.Networking.Sockets;
 using Windows.UI.Xaml;
 
 namespace UwpHmiToolkit.Protocol
 {
-    /// <summary>
-    /// 
-    /// </summary>
     [JsonConverter(typeof(StringEnumConverter))]
-    public enum ProtocolType
+    public enum ApplicationLayerProtocol
     {
         Unknown = 0,
-        McProtocolUdp,
-        McProtocolTcp,
-
-        ModbusRtu,
-        ModbusAscii,
-
+        McProtocol,
+        Modbus,
         EthernetIP,
     };
+
+    [JsonConverter(typeof(StringEnumConverter))]
+    public enum TransmissionLayerProtocol { UDP = 0, TCP = 1 }
+
+    [JsonConverter(typeof(StringEnumConverter))]
+    public enum CommunicationCode { Binary = 0, ASCII = 1 }
+
+    [JsonConverter(typeof(StringEnumConverter))]
+    public enum ModbusMethod { RTU = 0, ASCII = 1, TCP = 2 }
 
 
     public abstract class EthernetProtocolBase
     {
-        public abstract Task<bool> TryConnect(); //override in inherited class, because udp / tcp use different methods.
-        public abstract Task<bool> TryDisconnect(); //override in inherited class
+        protected DatagramSocket udpSocket;
+        protected StreamSocket tcpSocket;
+        protected Stream outputStream, inputStream;
+        protected StreamWriter streamWriter;
+        protected StreamReader streamReader;
+
+        /// <summary>
+        /// Try to open a connection, returns true if succeed and returns false if fail.
+        /// </summary>
+        /// <returns></returns>
+        public abstract Task<bool> TryConnectAsync(); //override in inherited class, because udp / tcp use different methods.
+
+        /// <summary>
+        /// Try to disconnect a connection, returns true if succeed and returns false if fail.
+        /// </summary>
+        /// <returns></returns>
+        public abstract Task TryDisconnectAsync(); //override in inherited class
+
+        protected virtual async Task<bool> UdpConnect()
+        {
+            if (this.udpSocket is null)
+            {
+                udpSocket = new DatagramSocket();
+                await udpSocket.BindServiceNameAsync(Port);
+            }
+
+            try
+            {
+                var pair = new EndpointPair(new HostName(GetLocalIp(HostName.CanonicalName)), Port, HostName, Port);
+
+                await udpSocket.ConnectAsync(pair);
+                outputStream = (await udpSocket.GetOutputStreamAsync(HostName, Port)).AsStreamForWrite();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                CommunicationError(ex.Message);
+                return false;
+            }
+        }
+
+        protected virtual async Task UdpDisconnect()
+        {
+            await udpSocket.CancelIOAsync();
+            udpSocket?.Dispose();
+        }
+
+
+        protected virtual async Task<bool> TcpConnect()
+        {
+            throw new NotImplementedException();
+        }
+
+        protected virtual async Task TcpDisconnect()
+        {
+            throw new NotImplementedException();
+        }
+
+
+        public abstract Task CommunicateAsync();
+
+        protected string GetLocalIp(string targetIp)
+        {
+            var match = targetIp.Substring(0, targetIp.LastIndexOf('.') + 1);
+            var icp = NetworkInformation.GetInternetConnectionProfile();
+
+            if (icp?.NetworkAdapter == null) return null;
+            var hns = NetworkInformation.GetHostNames();
+            var hostname =
+                hns.First(hn =>
+                    hn.Type == HostNameType.Ipv4 &&
+                    hn.IPInformation?.NetworkAdapter != null &&
+                    hn.IPInformation.NetworkAdapter.NetworkAdapterId == icp.NetworkAdapter.NetworkAdapterId &&
+                    hn.CanonicalName.Contains(match));
+
+            return hostname?.CanonicalName;
+        }
 
         /// <summary>
         /// Interval of refresh in ms.
         /// </summary>
-        public ushort RefreshInterval;
+        public ushort RefreshInterval { get; }
 
-        /// <summary>
-        /// Period of Reconnect.
-        /// </summary>
-        public ushort ReconnectPeriod;
+        public HostName HostName { get; }
 
-        HostName HostName { get; }
-
-        public string IP { get => this.HostName.IPInformation.ToString(); }
+        public string IP => HostName.CanonicalName;
 
         public string Port { get; }
 
-        private bool isOnline;
+        public ushort Timeout { get; }
+
+        public int SendDelay { get; }
+
+        public bool IsReadonly { get; set; }
+
+        public delegate void OnlineStateChangeHandler();
+        public event OnlineStateChangeHandler OnlineStateChanged;
+        protected virtual void RaiseOnlineStateChange() => OnlineStateChanged?.Invoke();
+
+        protected bool isOnline;
         public bool IsOnline { get => isOnline; }
 
-        public List<Device> DevicesToMonitor { get; }
+        protected readonly List<Device> devicesToMonitor = new List<Device>();
 
-        public List<DeviceToWrite> DevicesToWrite { get; }
+        protected readonly List<DeviceToWrite> devicesToWrite = new List<DeviceToWrite>();
 
-        private DispatcherTimer dispatcherTimer;
+        protected abstract void RefreshReadCommand();
+
+
+        protected DispatcherTimer dispatcherTimer;
 
         public virtual void Start() => dispatcherTimer.Start();
 
         public virtual void Stop() => dispatcherTimer.Stop();
 
-        private void SetupTimer()
+        protected virtual void SetupTimer()
         {
             dispatcherTimer = new DispatcherTimer() { Interval = new TimeSpan(0, 0, 0, 0, RefreshInterval) };
             dispatcherTimer.Tick += DispatcherTimer_Tick;
         }
 
-        private async void DispatcherTimer_Tick(object sender, object e)
+        protected virtual async void DispatcherTimer_Tick(object sender, object e)
         {
             dispatcherTimer.Stop();
 
-            if (!isOnline)
-                isOnline = await TryConnect();
-
-            //TODO: Universal  Read / Write procdure
+            if (IsOnline)
+                await CommunicateAsync();
 
             dispatcherTimer.Start();
         }
 
-        public virtual void ReveresBit(BitDevice bitDevice) => DevicesToWrite.Add(new BitToWrite(bitDevice, !bitDevice.Value));
-        public virtual void SetBit(BitDevice bitDevice) => DevicesToWrite.Add(new BitToWrite(bitDevice, true));
-        public virtual void ResBit(BitDevice bitDevice) => DevicesToWrite.Add(new BitToWrite(bitDevice, false));
+
+
+        #region Device I/O Action
+
+        public virtual void AddRead(Device device)
+        {
+            if (!devicesToMonitor.Any(d => d.Name == device.Name))
+                devicesToMonitor.Add(device);
+            RefreshReadCommand();
+        }
+        public virtual void RemoveRead(Device device)
+        {
+            devicesToMonitor.RemoveAll(d => d.Name == device.Name);
+            RefreshReadCommand();
+        }
+
+        public virtual void AddReads(IEnumerable<Device> devices)
+        {
+            devicesToMonitor.AddRange(devices.Where(d => !devicesToMonitor.Any(m => m.Name == d.Name)));
+            RefreshReadCommand();
+        }
+
+        public virtual void RemoveReads()
+        {
+
+        }
+
+        public virtual void ReveresBit(BitDevice bitDevice) => devicesToWrite.Add(new BitToWrite(bitDevice, !bitDevice.Value));
+
+        public virtual void SetBit(BitDevice bitDevice) => devicesToWrite.Add(new BitToWrite(bitDevice, true));
+
+        public virtual void ResBit(BitDevice bitDevice) => devicesToWrite.Add(new BitToWrite(bitDevice, false));
 
         public virtual void SetMomentory(BitDevice bitDevice)
         {
-            DevicesToWrite.Add(new BitToWrite(bitDevice, true));
-            DevicesToWrite.Add(new BitToWrite(bitDevice, false));
+            devicesToWrite.Add(new BitToWrite(bitDevice, true));
+            devicesToWrite.Add(new BitToWrite(bitDevice, false));
         }
+
+        public virtual void WriteWord(WordDevice wordDevice, int newValue) => devicesToWrite.Add(new WordToWrite(wordDevice, newValue));
+
+        public virtual void WriteDevices(IEnumerable<DeviceToWrite> devices) => devicesToWrite.AddRange(devices);
+
+        #endregion /Device I/O Action
 
         public delegate void CommunicationErrorHandler(string message); //TODO: Create ErrorInfo Class.
         public event CommunicationErrorHandler CommunicationError; //TODO: Consider->turn off isOnline when error happened?
+        protected virtual void RaiseCommError(string message) => CommunicationError?.Invoke(message);
+
+
+        protected EthernetProtocolBase(ProtocolSettingBase setting)
+        {
+            this.HostName = new HostName(setting.Ip);
+            this.Port = setting.Port;
+            this.RefreshInterval = setting.RefreshInterval;
+            this.Timeout = setting.Timeout;
+        }
     }
-
-    public abstract class TcpProtocol : EthernetProtocolBase
-    {
-
-    }
-
-    public abstract class UdpProtocol : EthernetProtocolBase
-    {
-
-    }
-
 
     public abstract class ProtocolSettingBase : AutoBindableBase
     {
+        public string Ip { get; set; }
 
-        public string IP { get; set; }
         public string Port { get; set; }
+
+        public ushort RefreshInterval { get; set; }
 
         /// <summary>
         /// Timeout in ms;
         /// </summary>
         public ushort Timeout { get; set; }
+
+        public ushort SendDelay { get; set; } 
     }
 
+
+    #region DeviceModel
 
     public abstract class Device : AutoBindableBase
     {
         protected uint address;
+        public uint Address => address;
+
+        protected string deviceType;
+        public string DeviceType => deviceType;
+
         public abstract void DecodeValue(byte[] valueInBytes);
+        public abstract string Name { get; }
     }
 
     public abstract class BitDevice : Device
     {
-        private byte subAddress;
+        public uint Channel => address / 0x10;
         public bool Value { get; set; }
-
-        protected BitDevice(uint address, byte subAddress)
-        {
-            this.address = address;
-            if (subAddress >= 0x0 && subAddress <= 0xf)
-                this.subAddress = subAddress;
-            else
-                throw new ArgumentOutOfRangeException($"Argument of subAddress out of range 0 ~ 15 : ({subAddress})");
-        }
-
         public override void DecodeValue(byte[] valueInBytes)
         {
             var length = valueInBytes.Length;
@@ -145,27 +267,29 @@ namespace UwpHmiToolkit.Protocol
             {
                 var bs = new byte[2];
                 Array.Copy(valueInBytes, bs, length);
-                this.Value = (BitConverter.ToUInt16(bs, 0) & (1 << subAddress)) != 0;
+                this.Value = (BitConverter.ToUInt16(bs, 0) & (1 << (int)(address % 0x10))) != 0;
             }
             else
                 throw new ArgumentOutOfRangeException($"ValueBytes Length Error: {length}.");
         }
-
-        //public void RefreshValue(byte channelValue)
-        //{
-        //    var i = subAddress % 8;
-        //    this.Value = (channelValue & (1 << i)) != 0;
-        //}
     }
 
     public abstract class WordDevice : Device
     {
         public int Value { get; set; }
 
-        private double? upperLimit, lowerLimit;
+        protected double? upperLimit, lowerLimit;
         public bool HasLimit => upperLimit is double u && lowerLimit is double l && u > l;
+        public double UpperLimit => upperLimit ?? double.MaxValue;
+        public double LowerLimit => lowerLimit ?? double.MinValue;
 
-        private bool UseDoubleWords;
+        protected readonly bool asDoubleWords;
+        public bool AsDoubleWords => asDoubleWords;
+
+        protected readonly bool asFloat;
+        public bool AsFloat => asFloat;
+
+        public bool Use2Channels => AsFloat || AsDoubleWords;
 
         public override void DecodeValue(byte[] valueInBytes)
         {
@@ -173,7 +297,7 @@ namespace UwpHmiToolkit.Protocol
             var length = valueInBytes.Length;
             if (length == 2 || length == 4)
             {
-                Array.Copy(valueInBytes, vs, UseDoubleWords ? 4 : 2);
+                Array.Copy(valueInBytes, vs, asDoubleWords ? 4 : 2);
                 Value = BitConverter.ToInt32(vs, 0);
             }
             else
@@ -184,31 +308,31 @@ namespace UwpHmiToolkit.Protocol
 
     public abstract class DeviceToWrite
     {
-
+        public Device Device;
     }
-
 
     public class BitToWrite : DeviceToWrite
     {
-        BitDevice device;
-        private bool value;
+        public new BitDevice Device;
+        public bool Value;
 
         public BitToWrite(BitDevice bitDevice, bool newValue)
         {
-            device = bitDevice;
-            value = newValue;
+            Device = bitDevice;
+            Value = newValue;
         }
     }
 
     public class WordToWrite : DeviceToWrite
     {
-        private WordDevice device;
-        private int value;
+        public new WordDevice Device;
+        public int Value;
         public WordToWrite(WordDevice wordDevice, int newValue)
         {
-            device = wordDevice;
-            value = newValue;
+            Device = wordDevice;
+            Value = newValue;
         }
     }
 
+    #endregion /DeviceModel
 }
