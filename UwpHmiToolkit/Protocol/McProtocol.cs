@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -63,7 +64,7 @@ namespace UwpHmiToolkit.Protocol.McProtocol
         };
 
         byte[] currentCmdSerialNo = new byte[2] { 0, 0 };
-        Dictionary<byte[], int> unhandledSerialIndexPairs = new Dictionary<byte[], int>();
+        Dictionary<int, int> unhandledSerialIndexPairs = new Dictionary<int, int>();
 
         const byte netWorkNo = 0x00, pcNo = 0xff, reqDestUnitStationNo = 0x00;
 
@@ -138,34 +139,34 @@ namespace UwpHmiToolkit.Protocol.McProtocol
                     RaiseCommError($"LostResponseData,count: {unhandledSerialIndexPairs.Count}.");
 
                 unhandledSerialIndexPairs.Clear();
-                for (int i = 0; i < splitedReadingCodes.Count; i++)
+                for (int i = 0; i < splitedReadingCmds.Count; i++)
                 {
-                    await SendCommand(ToMcCommand4E(splitedReadingCodes[i], i));
+                    await SendCommand(ToMcCommand4E(splitedReadingCmds[i], i));
                 }
             }
         }
 
 
 
-        private Dictionary<Device, int> deviceIndexPairs;
-        private List<List<Device>> splitedDeviceWaitingForValue;
-        private List<byte[]> splitedReadingCodes, responseData;
-        private IOrderedEnumerable<McBitDevice> bitDevices;
-        private IOrderedEnumerable<McWordDevice> wordDevices;
-        private IOrderedEnumerable<McWordDevice> dwordDevices;
+        private readonly Dictionary<Device, int> deviceIndexPairs = new Dictionary<Device, int>();
+        private List<Dictionary<Device, int>> splitedDeviceWaitingForValue;
+        private readonly List<byte[]> splitedReadingCmds = new List<byte[]>(), responseData = new List<byte[]>();
+        private IEnumerable<McBitDevice> bitDevices;
+        private IEnumerable<McWordDevice> wordDevices;
+        private IEnumerable<McWordDevice> dwordDevices;
 
         private void PrepareReadingCmds()
         {
-            bitDevices = from McBitDevice bd in devicesToMonitor
+            bitDevices = from bd in devicesToMonitor.OfType<McBitDevice>()
                          orderby bd.DeviceType, bd.Address
                          select bd;
 
-            wordDevices = from McWordDevice wd in devicesToMonitor
+            wordDevices = from wd in devicesToMonitor.OfType<McWordDevice>()
                           where !wd.Use2Channels
                           orderby wd.DeviceType, wd.Address
                           select wd;
 
-            dwordDevices = from McWordDevice dwd in devicesToMonitor
+            dwordDevices = from dwd in devicesToMonitor.OfType<McWordDevice>()
                            where dwd.Use2Channels
                            orderby dwd.DeviceType, dwd.Address
                            select dwd;
@@ -173,48 +174,86 @@ namespace UwpHmiToolkit.Protocol.McProtocol
             string lastType = "";
             uint lastChannel = 0;
             int index = 0;
-            var readingDeviceCodes = new List<byte[]>();
-            foreach (var b in bitDevices)
+
+            deviceIndexPairs.Clear();
+            if (bitDevices.Count() > 0)
             {
-                if ((lastType != b.DeviceType || lastChannel != b.Channel)
-                    && index != 0)
-                    index++;
-
-                deviceIndexPairs.Add(b, index);
-                readingDeviceCodes.Add(b.GetDeviceCodeForRead());
-
-                lastType = b.DeviceType;
-                lastChannel = b.Channel;
-            }
-
-            foreach (var w in wordDevices)
-            {
-                index++;
-                deviceIndexPairs.Add(w, index);
-                readingDeviceCodes.Add(w.GetDeviceCodeForRead());
-            }
-
-            foreach (var dw in dwordDevices)
-            {
-                index++;
-                deviceIndexPairs.Add(dw, index);
-                readingDeviceCodes.Add(dw.GetDeviceCodeForRead());
-            }
-
-
-            var splitedDeviceCodes = SplitList(readingDeviceCodes);
-
-            splitedReadingCodes = new List<byte[]>();
-            foreach (var dcs in splitedDeviceCodes)
-            {
-                var bytes = new byte[0];
-                foreach (var dc in dcs)
+                foreach (var b in bitDevices)
                 {
-                    bytes.Concat(dc);
+                    deviceIndexPairs.Add(b, index);
+
+                    if ((lastType != b.DeviceType || lastChannel != b.Channel)
+                        && index != 0)
+                        index++;
+
+                    lastType = b.DeviceType;
+                    lastChannel = b.Channel;
                 }
-                splitedReadingCodes.Add(bytes);
+            }
+            if (wordDevices.Count() > 0)
+            {
+                foreach (var w in wordDevices)
+                {
+                    deviceIndexPairs.Add(w, index);
+                    index++;
+                }
+            }
+            if (dwordDevices.Count() > 0)
+            {
+                foreach (var dw in dwordDevices)
+                {
+                    deviceIndexPairs.Add(dw, index);
+                    index++;
+                }
             }
             splitedDeviceWaitingForValue = SplitDicitionay(deviceIndexPairs).ToList();
+
+            splitedReadingCmds.Clear();
+            foreach (var dict in splitedDeviceWaitingForValue)
+            {
+                var list = dict.Keys.ToList();
+                byte ch1 = 0;
+                byte ch2 = 0;
+                index = 0;
+                lastType = "";
+                lastChannel = 0;
+                var length = (dict.Values.Max() % randomReadsMaxCount + 1) * 4;
+                var bytes = new byte[length];
+                foreach (var d in list)
+                {
+                    if (d is McBitDevice b)
+                    {
+                        if (lastType != b.DeviceType || lastChannel != b.Channel)
+                        {
+                            var deviceCode = b.GetDeviceCodeForRead();
+                            Array.Copy(deviceCode, 0, bytes, index, deviceCode.Length);
+                            index += deviceCode.Length;
+                            ch1++;
+                        }
+                        lastType = b.DeviceType;
+                        lastChannel = b.Channel;
+                    }
+                    if (d is McWordDevice w && !w.Use2Channels)
+                    {
+                        var deviceCode = w.GetDeviceCodeForRead();
+                        Array.Copy(deviceCode, 0, bytes, index, deviceCode.Length);
+                        index += deviceCode.Length;
+                        ch1++;
+                    }
+                    if (d is McWordDevice dw && dw.Use2Channels)
+                    {
+                        var deviceCode = dw.GetDeviceCodeForRead();
+                        Array.Copy(deviceCode, 0, bytes, index, deviceCode.Length);
+                        index += deviceCode.Length;
+                        ch2++;
+                    }
+                }
+                var cmd = new byte[6] { 0x03, 0x04, 0x00, 0x00, ch1, ch2 }.Concat(bytes).ToArray();
+
+                splitedReadingCmds.Add(cmd);
+            }
+
+
         }
 
         private void UdpSocket_MessageReceived(DatagramSocket sender, DatagramSocketMessageReceivedEventArgs args)
@@ -225,12 +264,12 @@ namespace UwpHmiToolkit.Protocol.McProtocol
                 dataReader.ReadBytes(response);
                 if (IsMcResponse(response, out var serialNumber, out var endcode, out var data))
                 {
+                    var s = BitConverter.ToUInt16(serialNumber, 0);
                     //Registered reading action
-                    if (unhandledSerialIndexPairs.ContainsKey(serialNumber))
+                    if (unhandledSerialIndexPairs.ContainsKey(s))
                     {
-                        unhandledSerialIndexPairs.Remove(serialNumber);
-                        var i = unhandledSerialIndexPairs[serialNumber];
-                        foreach (var device in splitedDeviceWaitingForValue[i])
+                        var i = unhandledSerialIndexPairs[s];
+                        foreach (var device in splitedDeviceWaitingForValue[i].Keys.ToList())
                         {
                             if (device is McBitDevice b)
                             {
@@ -250,7 +289,12 @@ namespace UwpHmiToolkit.Protocol.McProtocol
                                 Array.Copy(data, deviceIndexPairs[dw] % randomReadsMaxCount, value, 0, 2);
                                 dw.DecodeValue(value);
                             }
+#if DEBUG
+                            var str = device is McWordDevice a ? a.Value.ToString() : (device as McBitDevice).Value.ToString();
+                            RaiseCommError($"Read {device.Name}: {str}");
+#endif
                         }
+                        unhandledSerialIndexPairs.Remove(s);
                     }
                     else
                     {
@@ -313,7 +357,7 @@ namespace UwpHmiToolkit.Protocol.McProtocol
             }
         }
 
-        private static IEnumerable<List<T>> SplitDicitionay<T>(Dictionary<T, int> totalDevices, int size = randomReadsMaxCount)
+        private static IEnumerable<Dictionary<T, int>> SplitDicitionay<T>(Dictionary<T, int> totalDevices, int size = randomReadsMaxCount)
         {
             for (int i = 0; i < totalDevices.Count; i += size)
             {
@@ -321,8 +365,8 @@ namespace UwpHmiToolkit.Protocol.McProtocol
                               where pair.Value >= i * size
                               && pair.Value < (i + 1) * size
                               orderby pair.Value
-                              select pair.Key;
-                yield return devices.ToList();
+                              select pair;
+                yield return devices.ToDictionary(p => p.Key, p => p.Value);
             }
         }
 
@@ -332,6 +376,7 @@ namespace UwpHmiToolkit.Protocol.McProtocol
 
         private async Task SendCommand(byte[] request)
         {
+            await Task.Delay(SendDelay);
             await outputStream.WriteAsync(request, 0, request.Length);
             await outputStream.FlushAsync();
         }
@@ -361,7 +406,11 @@ namespace UwpHmiToolkit.Protocol.McProtocol
             var t = a.Concat(currentCmdSerialNo).Concat(b).Concat(text).ToArray();
 
             if (index is int i)
-                unhandledSerialIndexPairs.Add(currentCmdSerialNo, i);
+            {
+                var s = BitConverter.ToUInt16(currentCmdSerialNo, 0);
+                unhandledSerialIndexPairs.Add(s, i);
+                Debug.WriteLine($"Send:{currentCmdSerialNo[0]},{currentCmdSerialNo[1]}");
+            }
 
             if (++currentCmdSerialNo[0] == 0)
                 ++currentCmdSerialNo[1];

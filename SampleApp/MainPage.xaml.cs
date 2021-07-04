@@ -22,19 +22,19 @@ namespace SampleApp
     public sealed partial class MainPage : Page
     {
         private readonly ViewModel ViewModel1 = new ViewModel();
-
         public McSetting Setting1 = new McSetting()
         {
-            Ip = "192.168.0.10",
+            Ip = "192.168.1.10",
             Port = "5000",
             TransmissionLayerProtocol = UwpHmiToolkit.Protocol.TransmissionLayerProtocol.UDP,
             Code = UwpHmiToolkit.Protocol.CommunicationCode.Binary,
-            RefreshInterval = 1000,
+            RefreshInterval = 0,
             Timeout = 1000,
+            SendDelay = 2,
         };
 
         public McProtocol Machine1;
-        public McProtocol.McBitDevice M100 = new McProtocol.McBitDevice("M100");
+        public McProtocol.McWordDevice DM100;
 
         public MainPage()
         {
@@ -42,11 +42,16 @@ namespace SampleApp
 
             Machine1 = new McProtocol(Setting1);
             Machine1.CommunicationError += Machine1_CommunicationError;
+            DM100 = DM(100);
+            Machine1.AddRead(DM100);
         }
 
-        private void Machine1_CommunicationError(string message)
+        private async void Machine1_CommunicationError(string message)
         {
-            ViewModel1.Messages.Insert(0, message);
+            await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
+            {
+                ViewModel1.Messages.Insert(0, message);
+            });
         }
 
         private class ViewModel : AutoBindableBase
@@ -59,9 +64,13 @@ namespace SampleApp
             await Machine1.TryConnectAsync();
         }
 
-        private void Pb_Disconnect_Click(object sender, RoutedEventArgs e)
+        private async void Pb_Disconnect_Click(object sender, RoutedEventArgs e)
         {
-
+            await Machine1.TryDisconnectAsync();
         }
+
+
+        public McProtocol.McWordDevice DM(int address) => new McProtocol.McWordDevice($"D{address}");
+
     }
 }

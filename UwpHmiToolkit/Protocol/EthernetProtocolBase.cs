@@ -55,11 +55,8 @@ namespace UwpHmiToolkit.Protocol
 
         protected virtual async Task<bool> UdpConnect()
         {
-            if (this.udpSocket is null)
-            {
-                udpSocket = new DatagramSocket();
-                await udpSocket.BindServiceNameAsync(Port);
-            }
+            udpSocket = new DatagramSocket();
+            await udpSocket.BindServiceNameAsync(Port);
 
             try
             {
@@ -238,7 +235,7 @@ namespace UwpHmiToolkit.Protocol
         /// </summary>
         public ushort Timeout { get; set; }
 
-        public ushort SendDelay { get; set; } 
+        public ushort SendDelay { get; set; }
     }
 
 
