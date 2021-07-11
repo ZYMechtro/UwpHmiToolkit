@@ -16,6 +16,7 @@ namespace UwpHmiToolkit.Protocol.McProtocol
     {
         public TransmissionLayerProtocol TransmissionLayerProtocol { get; }
         public CommunicationCode Code { get; }
+
         public static readonly Dictionary<string, byte> DeviceTypeCodePairs = new Dictionary<string, byte>()
         {
             { "SM", 0x91 }, //Special Relay
@@ -108,17 +109,32 @@ namespace UwpHmiToolkit.Protocol.McProtocol
             }
         }
 
-        bool needToRefreshReading;
-        protected override void RefreshReadCommand() => needToRefreshReading = true;
-
-
         public override async Task CommunicateAsync()
         {
             //Writing Actions
             if (!IsReadonly && devicesToWrite.Count > 0)
             {
-                //TODO: Improved Write-Commands
+                var current = new List<DeviceToWrite>();
+                var splited = new List<List<DeviceToWrite>> { current };
+                Type lastDevice = null;
+                foreach (var dw in devicesToWrite)
+                {
+                    if (lastDevice != null && dw.Device.GetType() != lastDevice)
+                    {
+                        current = new List<DeviceToWrite>();
+                        splited.Add(current);
+                    }
+                    current.Add(dw);
+                }
+
+                foreach (var list in splited)
+                {
+                    await SendCommand(AddFrame4E(RandomWrite(list)));
+                }
+                devicesToWrite.Clear();
             }
+            else if (IsReadonly)
+                devicesToWrite.Clear();
 
             //TODO: Customized Tasks (Future)
 
@@ -131,7 +147,7 @@ namespace UwpHmiToolkit.Protocol.McProtocol
 
             if (devicesToMonitor.Count == 0)
             {
-                await SendCommand(ToMcCommand4E(loopTestCommand));
+                await SendCommand(AddFrame4E(loopTestCommand));
             }
             else if (devicesToMonitor.Count > 0)
             {
@@ -141,16 +157,14 @@ namespace UwpHmiToolkit.Protocol.McProtocol
                 unhandledSerialIndexPairs.Clear();
                 for (int i = 0; i < splitedReadingCmds.Count; i++)
                 {
-                    await SendCommand(ToMcCommand4E(splitedReadingCmds[i], i));
+                    await SendCommand(AddFrame4E(splitedReadingCmds[i], i));
                 }
             }
         }
 
-
-
         private readonly Dictionary<Device, int> deviceIndexPairs = new Dictionary<Device, int>();
-        private List<Dictionary<Device, int>> splitedDeviceWaitingForValue;
         private readonly List<byte[]> splitedReadingCmds = new List<byte[]>(), responseData = new List<byte[]>();
+        private List<Dictionary<Device, int>> splitedDeviceWaitingForValue;
         private IEnumerable<McBitDevice> bitDevices;
         private IEnumerable<McWordDevice> wordDevices;
         private IEnumerable<McWordDevice> dwordDevices;
@@ -180,11 +194,10 @@ namespace UwpHmiToolkit.Protocol.McProtocol
             {
                 foreach (var b in bitDevices)
                 {
-                    deviceIndexPairs.Add(b, index);
-
-                    if ((lastType != b.DeviceType || lastChannel != b.Channel)
-                        && index != 0)
+                    if ((lastType != b.DeviceType && index != 0) || lastChannel != b.Channel)
                         index++;
+
+                    deviceIndexPairs.Add(b, index);
 
                     lastType = b.DeviceType;
                     lastChannel = b.Channel;
@@ -194,16 +207,16 @@ namespace UwpHmiToolkit.Protocol.McProtocol
             {
                 foreach (var w in wordDevices)
                 {
-                    deviceIndexPairs.Add(w, index);
                     index++;
+                    deviceIndexPairs.Add(w, index);
                 }
             }
             if (dwordDevices.Count() > 0)
             {
                 foreach (var dw in dwordDevices)
                 {
-                    deviceIndexPairs.Add(dw, index);
                     index++;
+                    deviceIndexPairs.Add(dw, index);
                 }
             }
             splitedDeviceWaitingForValue = SplitDicitionay(deviceIndexPairs).ToList();
@@ -256,7 +269,7 @@ namespace UwpHmiToolkit.Protocol.McProtocol
 
         }
 
-        private void UdpSocket_MessageReceived(DatagramSocket sender, DatagramSocketMessageReceivedEventArgs args)
+        private async void UdpSocket_MessageReceived(DatagramSocket sender, DatagramSocketMessageReceivedEventArgs args)
         {
             using (var dataReader = args.GetDataReader())
             {
@@ -268,30 +281,39 @@ namespace UwpHmiToolkit.Protocol.McProtocol
                     //Registered reading action
                     if (unhandledSerialIndexPairs.ContainsKey(s))
                     {
-                        var i = unhandledSerialIndexPairs[s];
-                        foreach (var device in splitedDeviceWaitingForValue[i].Keys.ToList())
+                        var i = 0;
+                        foreach (var device in splitedDeviceWaitingForValue[unhandledSerialIndexPairs[s]].Keys.ToList())
                         {
-                            if (device is McBitDevice b)
+                            await CurrentDispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
                             {
-                                var value = new byte[2];
-                                Array.Copy(data, deviceIndexPairs[b] % randomReadsMaxCount, value, 0, 2);
-                                b.DecodeValue(value);
-                            }
-                            else if (device is McWordDevice w && !w.Use2Channels)
-                            {
-                                var value = new byte[2];
-                                Array.Copy(data, deviceIndexPairs[w] % randomReadsMaxCount, value, 0, 2);
-                                w.DecodeValue(value);
-                            }
-                            else if (device is McWordDevice dw && dw.Use2Channels)
-                            {
-                                var value = new byte[4];
-                                Array.Copy(data, deviceIndexPairs[dw] % randomReadsMaxCount, value, 0, 2);
-                                dw.DecodeValue(value);
-                            }
+                                if (device is McBitDevice b)
+                                {
+                                    var value = new byte[2];
+                                    Array.Copy(data, i, value, 0, 2);
+                                    i += 2;
+                                    b.DecodeValue(value);
+
+                                }
+                                else if (device is McWordDevice w && !w.Use2Channels)
+                                {
+                                    var value = new byte[2];
+                                    Array.Copy(data, i, value, 0, 2);
+                                    i += 2;
+                                    w.DecodeValue(value);
+                                }
+                                else if (device is McWordDevice dw && dw.Use2Channels)
+                                {
+                                    var value = new byte[4];
+                                    Array.Copy(data, i, value, 0, 4);
+                                    i += 4;
+                                    dw.DecodeValue(value);
+                                }
+
+                            });
 #if DEBUG
                             var str = device is McWordDevice a ? a.Value.ToString() : (device as McBitDevice).Value.ToString();
-                            RaiseCommError($"Read {device.Name}: {str}");
+                            //RaiseCommError($"Read {device.Name}: {str}");
+                            Debug.WriteLine($"Read {device.Name}: {str}");
 #endif
                         }
                         unhandledSerialIndexPairs.Remove(s);
@@ -348,7 +370,8 @@ namespace UwpHmiToolkit.Protocol.McProtocol
             }
         }
 
-        const int randomReadsMaxCount = 192;
+        private const int randomReadsMaxCount = 192;
+
         private static IEnumerable<List<T>> SplitList<T>(List<T> devices, int size = randomReadsMaxCount)
         {
             for (int i = 0; i < devices.Count; i += size)
@@ -373,7 +396,6 @@ namespace UwpHmiToolkit.Protocol.McProtocol
 
         #region Commands
 
-
         private async Task SendCommand(byte[] request)
         {
             await Task.Delay(SendDelay);
@@ -381,10 +403,11 @@ namespace UwpHmiToolkit.Protocol.McProtocol
             await outputStream.FlushAsync();
         }
 
-        private byte[] ToMcCommand4E(byte[] commandContent) => AddSubHeader(PackRequestData(commandContent), null);
-        private byte[] ToMcCommand4E(byte[] commandContent, int index) => AddSubHeader(PackRequestData(commandContent), index);
+        private byte[] AddFrame4E(byte[] commandContent) => AddSubHeader(commandContent, null);
 
-        private static byte[] PackRequestData(byte[] commandContent)
+        private byte[] AddFrame4E(byte[] commandContent, int index) => AddSubHeader(commandContent, index);
+
+        private byte[] AddSubHeader(byte[] commandContent, int? index)
         {
             byte[] a = new byte[5] { netWorkNo, pcNo, 0xff, 0x03, reqDestUnitStationNo };
             byte[] cpuMonitorTimer = new byte[2] { 0x10, 0x00 };
@@ -395,15 +418,10 @@ namespace UwpHmiToolkit.Protocol.McProtocol
 
             byte[] l = new byte[2] { BitConverter.GetBytes(length)[0], BitConverter.GetBytes(length)[1] };
             var t = a.Concat(l).Concat(cpuMonitorTimer).Concat(commandContent).ToArray();
-            return t;
-        }
 
-
-        private byte[] AddSubHeader(byte[] text, int? index)
-        {
-            byte[] a = new byte[] { 0x54, 0x00 };
-            byte[] b = new byte[] { 0x00, 0x00 };
-            var t = a.Concat(currentCmdSerialNo).Concat(b).Concat(text).ToArray();
+            byte[] b = new byte[] { 0x54, 0x00 };
+            byte[] c = new byte[] { 0x00, 0x00 };
+            var result = b.Concat(currentCmdSerialNo).Concat(c).Concat(t).ToArray();
 
             if (index is int i)
             {
@@ -415,24 +433,72 @@ namespace UwpHmiToolkit.Protocol.McProtocol
             if (++currentCmdSerialNo[0] == 0)
                 ++currentCmdSerialNo[1];
 
-            return t;
+            return result;
         }
 
         private readonly byte[] loopTestCommand = new byte[8] { 0x19, 0x06, 0x0, 0x0, 0x02, 0x00, 0x4f, 0x4b };
 
+        private byte[] RandomWrite(List<DeviceToWrite> writes)
+        {
+            if (!(writes.All(device => device.Device is McBitDevice) || writes.All(device => device.Device is McWordDevice)))
+            {
+                throw new ArgumentException("Devices of Writelist is type-mixed or null.");
+            }
+            else
+            {
+                if (writes.First().Device is McBitDevice)
+                {
+                    var count = BitConverter.GetBytes(writes.Count)[0];
+                    var commandHeader = new byte[5] { 0x02, 0x14, 0x01, 0x00, count };
+                    var array = new byte[count * 5];
+                    for (int i = 0; i < count; i++)
+                    {
+                        var dw = writes[i] as BitToWrite;
+                        Array.Copy((dw.Device as McBitDevice).GetDeviceCodeForWrite(), 0, array, i * 5, 4);
+                        array[i * 5 + 4] = (byte)(dw.Value ? 1 : 0);
+                    }
+                    return commandHeader.Concat(array).ToArray();
+                }
+                else
+                {
+                    var ordered = from dw in writes.OfType<WordToWrite>()
+                                  orderby (dw.Device as McWordDevice).Use2Channels descending
+                                  select dw;
+                    byte count1 = 0, count2 = 0;
+                    var array = new List<byte>();
+                    foreach (var d in ordered)
+                    {
+                        if (!(d.Device as McWordDevice).Use2Channels)
+                        {
+                            count1++;
+                            var address = (d.Device as McWordDevice).GetDeviceCodeForWrite();
+                            var value = BitConverter.GetBytes(d.Value).Take(2);
+                            array = array.Concat(address).Concat(value).ToList();
+                        }
+                        else
+                        {
+                            count2++;
+                            var address = (d.Device as McWordDevice).GetDeviceCodeForWrite();
+                            var value = BitConverter.GetBytes(d.Value);
+                            array = array.Concat(address).Concat(value).ToList();
+                        }
+                    }
+                    var commandHeader = new byte[6] { 0x02, 0x14, 0x00, 0x00, count1, count2 };
+                    return commandHeader.Concat(array).ToArray();
+                }
+            }
+        }
 
         #endregion /Commands
 
 
-
-
         #region Devices
+
         interface IMcDevices
         {
             byte[] GetDeviceCodeForRead();
             byte[] GetDeviceCodeForWrite();
         }
-
 
         public class McBitDevice : BitDevice, IMcDevices
         {
@@ -461,7 +527,7 @@ namespace UwpHmiToolkit.Protocol.McProtocol
 
             public McBitDevice(string name)
             {
-                if (IsNameFormatCorrect(name, out var type, out var address) && DeviceTypeCodePairs.ContainsKey(type))
+                if (IsNameFormatCorrect(name, out string type, out uint address) && DeviceTypeCodePairs.ContainsKey(type))
                 {
                     deviceType = type;
                     this.address = address;
@@ -504,15 +570,14 @@ namespace UwpHmiToolkit.Protocol.McProtocol
                 }
             }
 
-            public McWordDevice(string name, double? upperLimit, double? lowerLimit) : this(name)
+            public McWordDevice(string name, double? upperLimit = null, double? lowerLimit = null, bool asDouble = false, bool asFloat = false) : this(name)
             {
                 this.upperLimit = upperLimit;
                 this.lowerLimit = lowerLimit;
+                this.asDoubleWords = asDouble || asFloat;
+                this.asFloat = asFloat;
             }
-
-
         }
-
 
         static bool IsNameFormatCorrect(string name, out string type, out uint address)
         {
@@ -520,8 +585,8 @@ namespace UwpHmiToolkit.Protocol.McProtocol
             string aParts = "", dParts = "";
             for (int i = 0; i < name.Length; i++)
             {
-                var c = name[i];
-                if (Char.IsLetter(c) && (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'))
+                char c = name[i];
+                if (char.IsLetter(c) && ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')))
                 {
                     if (indexA < 0)
                         indexA = i;
@@ -555,11 +620,10 @@ namespace UwpHmiToolkit.Protocol.McProtocol
 
         }
 
-
         #endregion /Devices
 
 
-        public McProtocol(McSetting setting) : base(setting)
+        public McProtocol(McSetting setting, Windows.UI.Core.CoreDispatcher dispatcher) : base(setting, dispatcher)
         {
             this.TransmissionLayerProtocol = setting.TransmissionLayerProtocol;
             this.Code = setting.Code;

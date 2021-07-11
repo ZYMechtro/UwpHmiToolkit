@@ -138,10 +138,12 @@ namespace UwpHmiToolkit.Protocol
 
         protected readonly List<DeviceToWrite> devicesToWrite = new List<DeviceToWrite>();
 
-        protected abstract void RefreshReadCommand();
-
+        protected bool needToRefreshReading;
 
         protected DispatcherTimer dispatcherTimer;
+
+        protected readonly Windows.UI.Core.CoreDispatcher CurrentDispatcher;
+
 
         public virtual void Start() => dispatcherTimer.Start();
 
@@ -164,31 +166,28 @@ namespace UwpHmiToolkit.Protocol
         }
 
 
-
         #region Device I/O Action
 
         public virtual void AddRead(Device device)
         {
             if (!devicesToMonitor.Any(d => d.Name == device.Name))
                 devicesToMonitor.Add(device);
-            RefreshReadCommand();
+            needToRefreshReading = true;
         }
+
         public virtual void RemoveRead(Device device)
         {
             devicesToMonitor.RemoveAll(d => d.Name == device.Name);
-            RefreshReadCommand();
+            needToRefreshReading = true;
         }
 
         public virtual void AddReads(IEnumerable<Device> devices)
         {
             devicesToMonitor.AddRange(devices.Where(d => !devicesToMonitor.Any(m => m.Name == d.Name)));
-            RefreshReadCommand();
+            needToRefreshReading = true;
         }
 
-        public virtual void RemoveReads()
-        {
-
-        }
+        public virtual void RemoveReads() => devicesToMonitor.Clear();
 
         public virtual void ReveresBit(BitDevice bitDevice) => devicesToWrite.Add(new BitToWrite(bitDevice, !bitDevice.Value));
 
@@ -202,24 +201,121 @@ namespace UwpHmiToolkit.Protocol
             devicesToWrite.Add(new BitToWrite(bitDevice, false));
         }
 
-        public virtual void WriteWord(WordDevice wordDevice, int newValue) => devicesToWrite.Add(new WordToWrite(wordDevice, newValue));
+        public virtual void WriteWord(WordDevice wordDevice, int newValue) => devicesToWrite.Add(_ = new WordToWrite(wordDevice, newValue));
 
         public virtual void WriteDevices(IEnumerable<DeviceToWrite> devices) => devicesToWrite.AddRange(devices);
 
         #endregion /Device I/O Action
 
-        public delegate void CommunicationErrorHandler(string message); //TODO: Create ErrorInfo Class.
-        public event CommunicationErrorHandler CommunicationError; //TODO: Consider->turn off isOnline when error happened?
+
+        public delegate void CommunicationErrorHandler(string message);
+        public event CommunicationErrorHandler CommunicationError;
         protected virtual void RaiseCommError(string message) => CommunicationError?.Invoke(message);
 
-
-        protected EthernetProtocolBase(ProtocolSettingBase setting)
+        protected EthernetProtocolBase(ProtocolSettingBase setting, Windows.UI.Core.CoreDispatcher dispatcher)
         {
             this.HostName = new HostName(setting.Ip);
             this.Port = setting.Port;
             this.RefreshInterval = setting.RefreshInterval;
             this.Timeout = setting.Timeout;
+            this.CurrentDispatcher = dispatcher;
         }
+
+        #region DeviceModel
+
+        public abstract class Device : AutoBindableBase
+        {
+            protected uint address;
+            public uint Address => address;
+
+            protected string deviceType;
+            public string DeviceType => deviceType;
+
+            public abstract void DecodeValue(byte[] valueInBytes);
+            public abstract string Name { get; }
+
+            public override string ToString() => Name;
+        }
+
+        public abstract class BitDevice : Device
+        {
+            public uint Channel => address / 0x10;
+            public bool Value { get; set; }
+            public override async void DecodeValue(byte[] valueInBytes)
+            {
+
+                var length = valueInBytes.Length;
+                if (length > 0 && length <= 2)
+                {
+                    var bs = new byte[2];
+                    Array.Copy(valueInBytes, bs, length);
+                    this.Value = (BitConverter.ToUInt16(bs, 0) & (1 << (int)(address % 0x10))) != 0;
+                }
+                else
+                    throw new ArgumentOutOfRangeException($"ValueBytes Length Error: {length}.");
+            }
+        }
+
+        public abstract class WordDevice : Device
+        {
+            public int Value { get; set; }
+
+            protected double? upperLimit, lowerLimit;
+            public bool HasLimit => upperLimit is double u && lowerLimit is double l && u > l;
+            public double UpperLimit => upperLimit ?? double.MaxValue;
+            public double LowerLimit => lowerLimit ?? double.MinValue;
+
+            protected bool asDoubleWords;
+            public bool AsDoubleWords => asDoubleWords;
+
+            protected bool asFloat;
+            public bool AsFloat => asFloat;
+
+            public bool Use2Channels => AsFloat || AsDoubleWords;
+
+            public override void DecodeValue(byte[] valueInBytes)
+            {
+                byte[] vs = new byte[4];
+                var length = valueInBytes.Length;
+                if (length == 2 || length == 4)
+                {
+                    Array.Copy(valueInBytes, vs, asDoubleWords ? 4 : 2);
+                    Value = BitConverter.ToInt32(vs, 0);
+                }
+                else
+                    throw new ArgumentOutOfRangeException($"ValueBytes Length Error: {length}.");
+            }
+        }
+
+        public abstract class DeviceToWrite
+        {
+            public Device Device;
+        }
+
+        public class BitToWrite : DeviceToWrite
+        {
+            public bool Value;
+
+            public BitToWrite(BitDevice bitDevice, bool newValue)
+            {
+                Device = bitDevice;
+                Value = newValue;
+            }
+        }
+
+        public class WordToWrite : DeviceToWrite
+        {
+            public int Value;
+            public WordToWrite(WordDevice wordDevice, int newValue)
+            {
+                Device = wordDevice;
+                Value = newValue;
+            }
+        }
+
+        #endregion /DeviceModel
+
+
     }
 
     public abstract class ProtocolSettingBase : AutoBindableBase
@@ -239,97 +335,4 @@ namespace UwpHmiToolkit.Protocol
     }
 
 
-    #region DeviceModel
-
-    public abstract class Device : AutoBindableBase
-    {
-        protected uint address;
-        public uint Address => address;
-
-        protected string deviceType;
-        public string DeviceType => deviceType;
-
-        public abstract void DecodeValue(byte[] valueInBytes);
-        public abstract string Name { get; }
-    }
-
-    public abstract class BitDevice : Device
-    {
-        public uint Channel => address / 0x10;
-        public bool Value { get; set; }
-        public override void DecodeValue(byte[] valueInBytes)
-        {
-            var length = valueInBytes.Length;
-            if (length > 0 && length <= 2)
-            {
-                var bs = new byte[2];
-                Array.Copy(valueInBytes, bs, length);
-                this.Value = (BitConverter.ToUInt16(bs, 0) & (1 << (int)(address % 0x10))) != 0;
-            }
-            else
-                throw new ArgumentOutOfRangeException($"ValueBytes Length Error: {length}.");
-        }
-    }
-
-    public abstract class WordDevice : Device
-    {
-        public int Value { get; set; }
-
-        protected double? upperLimit, lowerLimit;
-        public bool HasLimit => upperLimit is double u && lowerLimit is double l && u > l;
-        public double UpperLimit => upperLimit ?? double.MaxValue;
-        public double LowerLimit => lowerLimit ?? double.MinValue;
-
-        protected readonly bool asDoubleWords;
-        public bool AsDoubleWords => asDoubleWords;
-
-        protected readonly bool asFloat;
-        public bool AsFloat => asFloat;
-
-        public bool Use2Channels => AsFloat || AsDoubleWords;
-
-        public override void DecodeValue(byte[] valueInBytes)
-        {
-            byte[] vs = new byte[4];
-            var length = valueInBytes.Length;
-            if (length == 2 || length == 4)
-            {
-                Array.Copy(valueInBytes, vs, asDoubleWords ? 4 : 2);
-                Value = BitConverter.ToInt32(vs, 0);
-            }
-            else
-                throw new ArgumentOutOfRangeException($"ValueBytes Length Error: {length}.");
-        }
-    }
-
-
-    public abstract class DeviceToWrite
-    {
-        public Device Device;
-    }
-
-    public class BitToWrite : DeviceToWrite
-    {
-        public new BitDevice Device;
-        public bool Value;
-
-        public BitToWrite(BitDevice bitDevice, bool newValue)
-        {
-            Device = bitDevice;
-            Value = newValue;
-        }
-    }
-
-    public class WordToWrite : DeviceToWrite
-    {
-        public new WordDevice Device;
-        public int Value;
-        public WordToWrite(WordDevice wordDevice, int newValue)
-        {
-            Device = wordDevice;
-            Value = newValue;
-        }
-    }
-
-    #endregion /DeviceModel
 }
