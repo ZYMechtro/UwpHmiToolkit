@@ -33,7 +33,7 @@ namespace UwpHmiToolkit.Protocol
     public enum ModbusMethod { RTU = 0, ASCII = 1, TCP = 2 }
 
 
-    public abstract class EthernetProtocolBase
+    public abstract class EthernetProtocolBase : BindableBase
     {
         protected DatagramSocket udpSocket;
         protected StreamSocket tcpSocket;
@@ -55,8 +55,11 @@ namespace UwpHmiToolkit.Protocol
 
         protected virtual async Task<bool> UdpConnect()
         {
-            udpSocket = new DatagramSocket();
-            await udpSocket.BindServiceNameAsync(Port);
+            if (udpSocket == null)
+            {
+                udpSocket = new DatagramSocket();
+                await udpSocket.BindServiceNameAsync(Port);
+            }
 
             try
             {
@@ -75,8 +78,13 @@ namespace UwpHmiToolkit.Protocol
 
         protected virtual async Task UdpDisconnect()
         {
-            await udpSocket.CancelIOAsync();
-            udpSocket?.Dispose();
+            if (udpSocket != null)
+            {
+                await udpSocket.CancelIOAsync();
+                udpSocket?.Dispose();
+                udpSocket = null;
+            }
+
         }
 
 
@@ -131,8 +139,15 @@ namespace UwpHmiToolkit.Protocol
         public event OnlineStateChangeHandler OnlineStateChanged;
         protected virtual void RaiseOnlineStateChange() => OnlineStateChanged?.Invoke();
 
+        protected virtual void ChangeOnlineStatus(bool b)
+        {
+            isOnline = b;
+            OnPropertyChanged("IsOnline");
+            RaiseOnlineStateChange();
+        }
+
         protected bool isOnline;
-        public bool IsOnline { get => isOnline; }
+        public bool IsOnline => isOnline;
 
         protected readonly List<Device> devicesToMonitor = new List<Device>();
 
@@ -147,7 +162,7 @@ namespace UwpHmiToolkit.Protocol
 
         public virtual void Start() => dispatcherTimer.Start();
 
-        public virtual void Stop() => dispatcherTimer.Stop();
+        public virtual void Stop() => dispatcherTimer?.Stop();
 
         protected virtual void SetupTimer()
         {

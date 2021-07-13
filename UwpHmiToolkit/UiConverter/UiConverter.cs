@@ -1,9 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Windows.UI;
 using Windows.UI.Xaml.Data;
+using Windows.UI.Xaml.Media;
 
 namespace UwpHmiToolkit.UiConverter
 {
@@ -34,4 +32,20 @@ namespace UwpHmiToolkit.UiConverter
             throw new NotImplementedException();
         }
     }
+
+    public class BoolToColor : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, string language)
+        {
+            return value is bool b && b
+                ? new SolidColorBrush() { Color = Colors.LightGreen }
+                : new SolidColorBrush() { Color = Colors.LightGray };
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, string language)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
 }

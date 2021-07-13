@@ -23,7 +23,8 @@
             <Button x:Name="Pb_Connect"
                     Content="Connect"
                     Margin="10"
-                    Click="Pb_Connect_Click" />
+                    Click="Pb_Connect_Click"
+                    Background="{x:Bind Machine1.IsOnline, Mode=OneWay, Converter={StaticResource BoolToColor}}" />
             <Button x:Name="Pb_Disconnect"
                     Content="Disconnect"
                     Margin="10"
@@ -34,7 +35,7 @@
             <StackPanel>
                 <TextBlock>DM100</TextBlock>
                 <Button x:Name="Pb_DM100"
-                        Content="{x:Bind DM100.Value, Mode=OneWay,Converter={StaticResource IntToStringConverter}}" 
+                        Content="{x:Bind DM100.Value, Mode=OneWay,Converter={StaticResource IntToStringConverter}}"
                         Click="Pb_DM100_Click"/>
             </StackPanel>
             <StackPanel>

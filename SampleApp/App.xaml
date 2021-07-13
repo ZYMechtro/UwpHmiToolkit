@@ -6,6 +6,7 @@
     <Application.Resources>
         <converter:IntToStringConverter x:Key="IntToStringConverter" />
         <converter:BoolToStringConverter x:Key="BoolToStringConverter" />
+        <converter:BoolToColor x:Key="BoolToColor" />
     </Application.Resources>
 
 </Application>

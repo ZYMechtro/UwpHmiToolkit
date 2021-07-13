@@ -78,7 +78,7 @@ namespace UwpHmiToolkit.Protocol.McProtocol
                 var result = await this.UdpConnect();
                 if (result)
                 {
-                    isOnline = true;
+                    ChangeOnlineStatus(true);
                     udpSocket.MessageReceived += UdpSocket_MessageReceived;
                     SetupTimer();
                     this.Start();
@@ -97,10 +97,11 @@ namespace UwpHmiToolkit.Protocol.McProtocol
         public override async Task TryDisconnectAsync()
         {
             this.Stop();
-            isOnline = false;
+            ChangeOnlineStatus(false);
             if (TransmissionLayerProtocol == TransmissionLayerProtocol.UDP)
             {
-                udpSocket.MessageReceived -= UdpSocket_MessageReceived;
+                if (udpSocket != null)
+                    udpSocket.MessageReceived -= UdpSocket_MessageReceived;
                 await UdpDisconnect();
             }
             else
