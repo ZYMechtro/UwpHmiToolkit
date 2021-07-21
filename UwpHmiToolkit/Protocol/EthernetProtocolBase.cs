@@ -2,7 +2,6 @@
 using Newtonsoft.Json.Converters;
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -11,6 +10,7 @@ using Windows.Networking;
 using Windows.Networking.Connectivity;
 using Windows.Networking.Sockets;
 using Windows.UI.Xaml;
+using Windows.UI.Xaml.Controls.Primitives;
 
 namespace UwpHmiToolkit.Protocol
 {
@@ -143,6 +143,7 @@ namespace UwpHmiToolkit.Protocol
         {
             isOnline = b;
             OnPropertyChanged("IsOnline");
+            devicesToWrite.Clear();
             RaiseOnlineStateChange();
         }
 
@@ -152,6 +153,8 @@ namespace UwpHmiToolkit.Protocol
         protected readonly List<Device> devicesToMonitor = new List<Device>();
 
         protected readonly List<DeviceToWrite> devicesToWrite = new List<DeviceToWrite>();
+
+        protected readonly Dictionary<ButtonBase, BitDevice> holdPairs = new Dictionary<ButtonBase, BitDevice>();
 
         protected bool needToRefreshReading;
 
@@ -216,6 +219,13 @@ namespace UwpHmiToolkit.Protocol
             devicesToWrite.Add(new BitToWrite(bitDevice, false));
         }
 
+        public virtual void HoldBit(BitDevice bitDevice, ButtonBase button)
+        {
+            //TODO: Hold button (ex: Jog)
+            //devicesToWrite.Add(_ = new BitToWrite(bitDevice, true));
+            holdPairs.TryAdd(button, bitDevice);
+        }
+
         public virtual void WriteWord(WordDevice wordDevice, int newValue) => devicesToWrite.Add(_ = new WordToWrite(wordDevice, newValue));
 
         public virtual void WriteDevices(IEnumerable<DeviceToWrite> devices) => devicesToWrite.AddRange(devices);
@@ -256,7 +266,7 @@ namespace UwpHmiToolkit.Protocol
         {
             public uint Channel => address / 0x10;
             public bool Value { get; set; }
-            public override async void DecodeValue(byte[] valueInBytes)
+            public override void DecodeValue(byte[] valueInBytes)
             {
 
                 var length = valueInBytes.Length;

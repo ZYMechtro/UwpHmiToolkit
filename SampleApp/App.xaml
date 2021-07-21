@@ -6,7 +6,11 @@
     <Application.Resources>
         <converter:IntToStringConverter x:Key="IntToStringConverter" />
         <converter:BoolToStringConverter x:Key="BoolToStringConverter" />
-        <converter:BoolToColor x:Key="BoolToColor" />
+        <converter:BoolToColorConverter x:Key="BoolToColorConverter" />
+        <converter:IntToDecimalStringConverter x:Key="IntToDecimalStringConverter" />
+        <converter:IntToHexStringConverter x:Key="IntToHexStringConverter" />
+        <converter:IntTypeFloatToStringConverter x:Key="IntTypeFloatToStringConverter" />
+        <converter:IntToVisibilityConverter  x:Key="IntToVisibilityConverter" />
     </Application.Resources>
 
 </Application>

@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Windows.Networking;
 using Windows.Networking.Sockets;
 using Windows.Storage.Streams;
+using Windows.UI.Xaml.Controls.Primitives;
 
 namespace UwpHmiToolkit.Protocol.McProtocol
 {
@@ -64,10 +65,10 @@ namespace UwpHmiToolkit.Protocol.McProtocol
             { "RD", 0x2c }, //Refresh data register
         };
 
-        byte[] currentCmdSerialNo = new byte[2] { 0, 0 };
-        Dictionary<int, int> unhandledSerialIndexPairs = new Dictionary<int, int>();
+        protected readonly byte[] currentCmdSerialNo = new byte[2] { 0, 0 };
+        protected readonly Dictionary<int, int> unhandledSerialIndexPairs = new Dictionary<int, int>();
 
-        const byte netWorkNo = 0x00, pcNo = 0xff, reqDestUnitStationNo = 0x00;
+        protected const byte netWorkNo = 0x00, pcNo = 0xff, reqDestUnitStationNo = 0x00;
 
         public override async Task<bool> TryConnectAsync()
         {
@@ -113,29 +114,60 @@ namespace UwpHmiToolkit.Protocol.McProtocol
         public override async Task CommunicateAsync()
         {
             //Writing Actions
-            if (!IsReadonly && devicesToWrite.Count > 0)
+            if (!IsReadonly)
             {
-                var current = new List<DeviceToWrite>();
-                var splited = new List<List<DeviceToWrite>> { current };
-                Type lastDevice = null;
-                foreach (var dw in devicesToWrite)
+                //TODO: Auto Reset Bit
+                if (holdPairs.Count > 0)
                 {
-                    if (lastDevice != null && dw.Device.GetType() != lastDevice)
+                    var listToRemove = new List<ButtonBase>();
+                    foreach (ButtonBase pbs in holdPairs.Keys)
                     {
-                        current = new List<DeviceToWrite>();
-                        splited.Add(current);
+                        if (pbs.IsPressed)
+                        {
+                            devicesToWrite.Add(new BitToWrite(holdPairs[pbs], true));
+                        }
+                        else
+                        {
+                            devicesToWrite.Add(new BitToWrite(holdPairs[pbs], false));
+                            listToRemove.Add(pbs);
+                        }
                     }
-                    current.Add(dw);
+                    foreach (ButtonBase pbs in listToRemove)
+                    {
+                        if (holdPairs.ContainsKey(pbs))
+                            holdPairs.Remove(pbs);
+                    }
                 }
 
-                foreach (var list in splited)
+                if (devicesToWrite.Count > 0)
                 {
-                    await SendCommand(AddFrame4E(RandomWrite(list)));
+                    var current = new List<DeviceToWrite>();
+                    var splited = new List<List<DeviceToWrite>> { current };
+                    Type lastType = null;
+                    string lastDeviceName = "";
+                    foreach (var dw in devicesToWrite)
+                    {
+                        if (lastType != null && (dw.Device.GetType() != lastType || dw.Device.Name == lastDeviceName))
+                        {
+                            current = new List<DeviceToWrite>();
+                            splited.Add(current);
+                        }
+                        current.Add(dw);
+                        lastType = dw.Device.GetType();
+                        lastDeviceName = dw.Device.Name;
+                    }
+
+                    foreach (var list in splited)
+                    {
+                        await SendCommand(AddFrame4E(RandomWrite(list)));
+                    }
+                    devicesToWrite.Clear();
                 }
-                devicesToWrite.Clear();
             }
             else if (IsReadonly)
+            {
                 devicesToWrite.Clear();
+            }
 
             //TODO: Customized Tasks (Future)
 
@@ -164,7 +196,7 @@ namespace UwpHmiToolkit.Protocol.McProtocol
         }
 
         private readonly Dictionary<Device, int> deviceIndexPairs = new Dictionary<Device, int>();
-        private readonly List<byte[]> splitedReadingCmds = new List<byte[]>(), responseData = new List<byte[]>();
+        private readonly List<byte[]> splitedReadingCmds = new List<byte[]>();
         private List<Dictionary<Device, int>> splitedDeviceWaitingForValue;
         private IEnumerable<McBitDevice> bitDevices;
         private IEnumerable<McWordDevice> wordDevices;
@@ -276,14 +308,14 @@ namespace UwpHmiToolkit.Protocol.McProtocol
             {
                 byte[] response = new byte[dataReader.UnconsumedBufferLength];
                 dataReader.ReadBytes(response);
-                if (IsMcResponse(response, out var serialNumber, out var endcode, out var data))
+                if (IsMcResponse(response, out byte[] serialNumber, out byte[] endcode, out byte[] data))
                 {
-                    var s = BitConverter.ToUInt16(serialNumber, 0);
+                    ushort sN = BitConverter.ToUInt16(serialNumber, 0);
                     //Registered reading action
-                    if (unhandledSerialIndexPairs.ContainsKey(s))
+                    if (unhandledSerialIndexPairs.ContainsKey(sN))
                     {
                         var i = 0;
-                        foreach (var device in splitedDeviceWaitingForValue[unhandledSerialIndexPairs[s]].Keys.ToList())
+                        foreach (var device in splitedDeviceWaitingForValue[unhandledSerialIndexPairs[sN]].Keys.ToList())
                         {
                             await CurrentDispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
                             {
@@ -312,26 +344,34 @@ namespace UwpHmiToolkit.Protocol.McProtocol
 
                             });
 #if DEBUG
-                            var str = device is McWordDevice a ? a.Value.ToString() : (device as McBitDevice).Value.ToString();
+                            //var str = device is McWordDevice a ? a.Value.ToString() : (device as McBitDevice).Value.ToString();
                             //RaiseCommError($"Read {device.Name}: {str}");
-                            Debug.WriteLine($"Read {device.Name}: {str}");
+                            //Debug.WriteLine($"Read {device.Name}: {str}");
 #endif
                         }
-                        unhandledSerialIndexPairs.Remove(s);
+                        unhandledSerialIndexPairs.Remove(sN);
                     }
                     else
                     {
                         if (!Enumerable.SequenceEqual(endcode, new byte[2] { 0, 0 }))
                         {
-                            RaiseCommError($"Response Error: {BitConverter.ToString(endcode)}");
+                            byte[] cmd, subCmd;
+                            string cmds = "", subCmds = "";
+                            if (data.Length > 6)
+                            {
+                                cmd = new byte[2] { data[6], data[7] };
+                                cmds = BitConverter.ToString(cmd);
+                                if (data.Length > 8)
+                                {
+                                    subCmd = new byte[2] { data[8], data[9] };
+                                    subCmds = BitConverter.ToString(subCmd);
+                                }
+                            }
+                            RaiseCommError($"Response Error: {BitConverter.ToString(endcode)}, Command:{cmds}, SubCommand:{cmds}.");
                         }
                     }
                 }
-
-
             }
-            //TODO: Handle received message
-
         }
 
         private bool IsMcResponse(byte[] source, out byte[] seiralNumber, out byte[] endcode, out byte[] responseData)
@@ -428,7 +468,6 @@ namespace UwpHmiToolkit.Protocol.McProtocol
             {
                 var s = BitConverter.ToUInt16(currentCmdSerialNo, 0);
                 unhandledSerialIndexPairs.Add(s, i);
-                Debug.WriteLine($"Send:{currentCmdSerialNo[0]},{currentCmdSerialNo[1]}");
             }
 
             if (++currentCmdSerialNo[0] == 0)

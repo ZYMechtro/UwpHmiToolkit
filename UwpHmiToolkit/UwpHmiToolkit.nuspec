@@ -2,13 +2,13 @@
 <package >
   <metadata>
     <id>UwpHmiToolkit</id>
-    <version>0.2.0-test</version>
+    <version>0.5.0-alpha</version>
     <title>UwpHmiToolkit</title>
     <authors>T.H. Lim</authors>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <license type="expression">MIT</license>
     <projectUrl>https://github.com/ZYMechtro/UwpHmiToolkit</projectUrl>
-    <icon>images\ZymPackageIcon.PNG</icon>
+    <icon>images\ZymPackageIcon.png</icon>
     <description>UwpHmiToolkit</description>
     <releaseNotes>ReleaseNotes</releaseNotes>
     <copyright>ZYMechtro</copyright>
@@ -24,13 +24,13 @@
     <file src="bin\Release\UwpHmiToolkit.xml" target="lib\uap10.0"/>
 
     <!-- WINMDs and resources -->
-    <file src="bin\x64\Release\UwpHmiToolkit.winmd" target="runtimes\win10-x64"/>
+    <file src="bin\x64\Release\UwpHmiToolkit.dll" target="runtimes\win10-x64"/>
     <file src="bin\x64\Release\UwpHmiToolkit.pri" target="runtimes\win10-x64"/>
 
-    <file src="bin\x86\Release\UwpHmiToolkit.winmd" target="runtimes\win10-x86"/>
+    <file src="bin\x86\Release\UwpHmiToolkit.dll" target="runtimes\win10-x86"/>
     <file src="bin\x86\Release\UwpHmiToolkit.pri" target="runtimes\win10-x86"/>
 
-    <file src=".\Images\ZymPackageIcon.PNG" target="images\" />
+    <file src=".\Images\ZymPackageIcon.png" target="images\" />
 
   </files>
   
