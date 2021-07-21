@@ -8,7 +8,7 @@
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <license type="expression">MIT</license>
     <projectUrl>https://github.com/ZYMechtro/UwpHmiToolkit</projectUrl>
-    <icon>images\ZymPackageIcon.png</icon>
+    <icon>images\ZymPackageIcon.PNG</icon>
     <description>UwpHmiToolkit</description>
     <releaseNotes>ReleaseNotes</releaseNotes>
     <copyright>ZYMechtro</copyright>
@@ -36,7 +36,7 @@
     <file src="bin\x86\Release\UwpHmiToolkit.dll" target="runtimes\win10-x86"/>
     <file src="bin\x86\Release\UwpHmiToolkit.pri" target="runtimes\win10-x86"/>
 
-    <file src=".\Images\ZymPackageIcon.png" target="images\" />
+    <file src=".\Images\ZymPackageIcon.png" target="images" />
 
   </files>
   
