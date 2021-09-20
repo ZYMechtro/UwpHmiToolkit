@@ -34,39 +34,39 @@ namespace SampleApp.PlcTools
 
         public static McProtocol.McBitDevice B(int address) => new McProtocol.McBitDevice($"B{address}");
 
-        public static McProtocol.McWordDevice CM(int address, double? upperLimit = null, double? lowerLimit = null, bool asDouble = false, bool asFloat = false)
+        public static McProtocol.McWordDevice CM(int address, double? upperLimit = null, double? lowerLimit = null, bool asDouble = false, bool asFloat = false, uint decimalPointPosition = 0)
         {
-            return new McProtocol.McWordDevice($"S{address}", upperLimit, lowerLimit, asDouble, asFloat);
+            return new McProtocol.McWordDevice($"S{address}", upperLimit, lowerLimit, asDouble, asFloat, decimalPointPosition);
         }
 
-        public static McProtocol.McWordDevice DM(int address, double? upperLimit = null, double? lowerLimit = null, bool asDouble = false, bool asFloat = false)
+        public static McProtocol.McWordDevice DM(int address, double? upperLimit = null, double? lowerLimit = null, bool asDouble = false, bool asFloat = false, uint decimalPointPosition = 0)
         {
-            return new McProtocol.McWordDevice($"D{address}", upperLimit, lowerLimit, asDouble, asFloat);
+            return new McProtocol.McWordDevice($"D{address}", upperLimit, lowerLimit, asDouble, asFloat, decimalPointPosition);
         }
 
-        public static McProtocol.McWordDevice EM(int address, double? upperLimit = null, double? lowerLimit = null, bool asDouble = false, bool asFloat = false)
+        public static McProtocol.McWordDevice EM(int address, double? upperLimit = null, double? lowerLimit = null, bool asDouble = false, bool asFloat = false, uint decimalPointPosition = 0)
         {
-            return new McProtocol.McWordDevice($"D{address + 100000}", upperLimit, lowerLimit, asDouble, asFloat);
+            return new McProtocol.McWordDevice($"D{address + 100000}", upperLimit, lowerLimit, asDouble, asFloat, decimalPointPosition);
         }
 
-        public static McProtocol.McWordDevice FM(int address, double? upperLimit = null, double? lowerLimit = null, bool asDouble = false, bool asFloat = false)
+        public static McProtocol.McWordDevice FM(int address, double? upperLimit = null, double? lowerLimit = null, bool asDouble = false, bool asFloat = false, uint decimalPointPosition = 0)
         {
-            return new McProtocol.McWordDevice($"R{address}", upperLimit, lowerLimit, asDouble, asFloat);
+            return new McProtocol.McWordDevice($"R{address}", upperLimit, lowerLimit, asDouble, asFloat, decimalPointPosition);
         }
 
-        public static McProtocol.McWordDevice ZF(int address, double? upperLimit = null, double? lowerLimit = null, bool asDouble = false, bool asFloat = false)
+        public static McProtocol.McWordDevice ZF(int address, double? upperLimit = null, double? lowerLimit = null, bool asDouble = false, bool asFloat = false, uint decimalPointPosition = 0)
         {
-            return new McProtocol.McWordDevice($"ZR{address}", upperLimit, lowerLimit, asDouble, asFloat);
+            return new McProtocol.McWordDevice($"ZR{address}", upperLimit, lowerLimit, asDouble, asFloat, decimalPointPosition);
         }
 
-        public static McProtocol.McWordDevice W(int address, double? upperLimit = null, double? lowerLimit = null, bool asDouble = false, bool asFloat = false)
+        public static McProtocol.McWordDevice W(int address, double? upperLimit = null, double? lowerLimit = null, bool asDouble = false, bool asFloat = false, uint decimalPointPosition = 0)
         {
-            return new McProtocol.McWordDevice($"W{address}", upperLimit, lowerLimit, asDouble, asFloat);
+            return new McProtocol.McWordDevice($"W{address}", upperLimit, lowerLimit, asDouble, asFloat, decimalPointPosition);
         }
 
-        public static McProtocol.McWordDevice Tcurrent(int address, double? upperLimit = null, double? lowerLimit = null, bool asDouble = false, bool asFloat = false)
+        public static McProtocol.McWordDevice Tcurrent(int address, double? upperLimit = null, double? lowerLimit = null, bool asDouble = false, bool asFloat = false, uint decimalPointPosition = 0)
         {
-            return new McProtocol.McWordDevice($"TN{address}", upperLimit, lowerLimit, asDouble, asFloat);
+            return new McProtocol.McWordDevice($"TN{address}", upperLimit, lowerLimit, asDouble, asFloat, decimalPointPosition);
         }
 
         public static McProtocol.McBitDevice Tcontact(int address)
@@ -74,9 +74,9 @@ namespace SampleApp.PlcTools
             return new McProtocol.McBitDevice($"TS{address}");
         }
 
-        public static McProtocol.McWordDevice Ccurrent(int address, double? upperLimit = null, double? lowerLimit = null, bool asDouble = false, bool asFloat = false)
+        public static McProtocol.McWordDevice Ccurrent(int address, double? upperLimit = null, double? lowerLimit = null, bool asDouble = false, bool asFloat = false, uint decimalPointPosition = 0)
         {
-            return new McProtocol.McWordDevice($"CN{address}", upperLimit, lowerLimit, asDouble, asFloat);
+            return new McProtocol.McWordDevice($"CN{address}", upperLimit, lowerLimit, asDouble, asFloat, decimalPointPosition);
         }
 
         public static McProtocol.McBitDevice Ccontact(int address)

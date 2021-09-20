@@ -116,11 +116,10 @@ namespace UwpHmiToolkit.Protocol.McProtocol
             //Writing Actions
             if (!IsReadonly)
             {
-                //TODO: Auto Reset Bit
                 if (holdPairs.Count > 0)
                 {
-                    var listToRemove = new List<ButtonBase>();
-                    foreach (ButtonBase pbs in holdPairs.Keys)
+                    var listToRemove = new List<RepeatButton>();
+                    foreach (RepeatButton pbs in holdPairs.Keys)
                     {
                         if (pbs.IsPressed)
                         {
@@ -132,7 +131,7 @@ namespace UwpHmiToolkit.Protocol.McProtocol
                             listToRemove.Add(pbs);
                         }
                     }
-                    foreach (ButtonBase pbs in listToRemove)
+                    foreach (RepeatButton pbs in listToRemove)
                     {
                         if (holdPairs.ContainsKey(pbs))
                             holdPairs.Remove(pbs);
@@ -315,17 +314,24 @@ namespace UwpHmiToolkit.Protocol.McProtocol
                     if (unhandledSerialIndexPairs.ContainsKey(sN))
                     {
                         var i = 0;
+                        string lastType = "";
+                        uint lastChannel = 0;
                         foreach (var device in splitedDeviceWaitingForValue[unhandledSerialIndexPairs[sN]].Keys.ToList())
                         {
                             await CurrentDispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
                             {
                                 if (device is McBitDevice b)
                                 {
+                                    if (b.DeviceType == lastType && b.Channel == lastChannel)
+                                    {
+                                        i -= 2;
+                                    }
                                     var value = new byte[2];
                                     Array.Copy(data, i, value, 0, 2);
                                     i += 2;
                                     b.DecodeValue(value);
-
+                                    lastType = b.DeviceType;
+                                    lastChannel = b.Channel;
                                 }
                                 else if (device is McWordDevice w && !w.Use2Channels)
                                 {
@@ -610,12 +616,13 @@ namespace UwpHmiToolkit.Protocol.McProtocol
                 }
             }
 
-            public McWordDevice(string name, double? upperLimit = null, double? lowerLimit = null, bool asDouble = false, bool asFloat = false) : this(name)
+            public McWordDevice(string name, double? upperLimit = null, double? lowerLimit = null, bool asDouble = false, bool asFloat = false, uint decimalPointPosition = 0) : this(name)
             {
                 this.upperLimit = upperLimit;
                 this.lowerLimit = lowerLimit;
                 this.asDoubleWords = asDouble || asFloat;
                 this.asFloat = asFloat;
+                this.decimalPointPositon = decimalPointPosition;
             }
         }
 
