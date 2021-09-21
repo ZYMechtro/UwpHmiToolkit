@@ -2,7 +2,7 @@
 <package >
   <metadata>
     <id>UwpHmiToolkit</id>
-    <version>0.5.2-alpha</version>
+    <version>0.5.3-alpha</version>
     <title>UwpHmiToolkit</title>
     <authors>T.H. Lim</authors>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>

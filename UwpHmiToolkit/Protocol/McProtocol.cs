@@ -116,11 +116,10 @@ namespace UwpHmiToolkit.Protocol.McProtocol
             //Writing Actions
             if (!IsReadonly)
             {
-                //TODO: Auto Reset Bit
                 if (holdPairs.Count > 0)
                 {
-                    var listToRemove = new List<ButtonBase>();
-                    foreach (ButtonBase pbs in holdPairs.Keys)
+                    var listToRemove = new List<RepeatButton>();
+                    foreach (RepeatButton pbs in holdPairs.Keys)
                     {
                         if (pbs.IsPressed)
                         {
@@ -132,7 +131,7 @@ namespace UwpHmiToolkit.Protocol.McProtocol
                             listToRemove.Add(pbs);
                         }
                     }
-                    foreach (ButtonBase pbs in listToRemove)
+                    foreach (RepeatButton pbs in listToRemove)
                     {
                         if (holdPairs.ContainsKey(pbs))
                             holdPairs.Remove(pbs);
@@ -186,7 +185,6 @@ namespace UwpHmiToolkit.Protocol.McProtocol
             {
                 if (unhandledSerialIndexPairs.Count > 0)
                     RaiseCommError($"LostResponseData,count: {unhandledSerialIndexPairs.Count}.");
-
                 unhandledSerialIndexPairs.Clear();
                 for (int i = 0; i < splitedReadingCmds.Count; i++)
                 {
@@ -315,17 +313,24 @@ namespace UwpHmiToolkit.Protocol.McProtocol
                     if (unhandledSerialIndexPairs.ContainsKey(sN))
                     {
                         var i = 0;
+                        string lastType = "";
+                        uint lastChannel = 0;
                         foreach (var device in splitedDeviceWaitingForValue[unhandledSerialIndexPairs[sN]].Keys.ToList())
                         {
                             await CurrentDispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
                             {
                                 if (device is McBitDevice b)
                                 {
+                                    if (b.DeviceType == lastType && b.Channel == lastChannel)
+                                    {
+                                        i -= 2;
+                                    }
                                     var value = new byte[2];
                                     Array.Copy(data, i, value, 0, 2);
                                     i += 2;
                                     b.DecodeValue(value);
-
+                                    lastType = b.DeviceType;
+                                    lastChannel = b.Channel;
                                 }
                                 else if (device is McWordDevice w && !w.Use2Channels)
                                 {
@@ -343,11 +348,6 @@ namespace UwpHmiToolkit.Protocol.McProtocol
                                 }
 
                             });
-#if DEBUG
-                            //var str = device is McWordDevice a ? a.Value.ToString() : (device as McBitDevice).Value.ToString();
-                            //RaiseCommError($"Read {device.Name}: {str}");
-                            //Debug.WriteLine($"Read {device.Name}: {str}");
-#endif
                         }
                         unhandledSerialIndexPairs.Remove(sN);
                     }
@@ -423,7 +423,7 @@ namespace UwpHmiToolkit.Protocol.McProtocol
 
         private static IEnumerable<Dictionary<T, int>> SplitDicitionay<T>(Dictionary<T, int> totalDevices, int size = randomReadsMaxCount)
         {
-            for (int i = 0; i < totalDevices.Count; i += size)
+            for (int i = 0; i <= totalDevices.Max(d => d.Value); i++)
             {
                 var devices = from pair in totalDevices
                               where pair.Value >= i * size
@@ -431,6 +431,7 @@ namespace UwpHmiToolkit.Protocol.McProtocol
                               orderby pair.Value
                               select pair;
                 yield return devices.ToDictionary(p => p.Key, p => p.Value);
+                i = devices.Max(d => d.Value);
             }
         }
 
@@ -610,12 +611,13 @@ namespace UwpHmiToolkit.Protocol.McProtocol
                 }
             }
 
-            public McWordDevice(string name, double? upperLimit = null, double? lowerLimit = null, bool asDouble = false, bool asFloat = false) : this(name)
+            public McWordDevice(string name, double? upperLimit = null, double? lowerLimit = null, bool asDouble = false, bool asFloat = false, uint decimalPointPosition = 0) : this(name)
             {
                 this.upperLimit = upperLimit;
                 this.lowerLimit = lowerLimit;
                 this.asDoubleWords = asDouble || asFloat;
                 this.asFloat = asFloat;
+                this.decimalPointPositon = decimalPointPosition;
             }
         }
 

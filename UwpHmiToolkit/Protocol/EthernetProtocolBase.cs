@@ -163,7 +163,7 @@ namespace UwpHmiToolkit.Protocol
         protected readonly Windows.UI.Core.CoreDispatcher CurrentDispatcher;
 
 
-        public virtual void Start() => dispatcherTimer.Start();
+        public virtual void Start() => dispatcherTimer?.Start();
 
         public virtual void Stop() => dispatcherTimer?.Stop();
 
@@ -190,22 +190,28 @@ namespace UwpHmiToolkit.Protocol
         {
             if (!devicesToMonitor.Any(d => d.Name == device.Name))
                 devicesToMonitor.Add(device);
+
             needToRefreshReading = true;
         }
 
         public virtual void RemoveRead(Device device)
         {
             devicesToMonitor.RemoveAll(d => d.Name == device.Name);
+
             needToRefreshReading = true;
         }
 
         public virtual void AddReads(IEnumerable<Device> devices)
         {
             devicesToMonitor.AddRange(devices.Where(d => !devicesToMonitor.Any(m => m.Name == d.Name)));
+
             needToRefreshReading = true;
         }
 
-        public virtual void RemoveReads() => devicesToMonitor.Clear();
+        public virtual void RemoveReads()
+        {
+            devicesToMonitor.Clear();
+        }
 
         public virtual void ReveresBit(BitDevice bitDevice) => devicesToWrite.Add(new BitToWrite(bitDevice, !bitDevice.Value));
 
@@ -219,11 +225,9 @@ namespace UwpHmiToolkit.Protocol
             devicesToWrite.Add(new BitToWrite(bitDevice, false));
         }
 
-        public virtual void HoldBit(BitDevice bitDevice, ButtonBase button)
+        public virtual void HoldBit(BitDevice bitDevice, RepeatButton repeatButton)
         {
-            //TODO: Hold button (ex: Jog)
-            //devicesToWrite.Add(_ = new BitToWrite(bitDevice, true));
-            holdPairs.TryAdd(button, bitDevice);
+            holdPairs.TryAdd(repeatButton, bitDevice);
         }
 
         public virtual void WriteWord(WordDevice wordDevice, int newValue) => devicesToWrite.Add(_ = new WordToWrite(wordDevice, newValue));
@@ -235,7 +239,10 @@ namespace UwpHmiToolkit.Protocol
 
         public delegate void CommunicationErrorHandler(string message);
         public event CommunicationErrorHandler CommunicationError;
-        protected virtual void RaiseCommError(string message) => CommunicationError?.Invoke(message);
+        protected virtual void RaiseCommError(string message)
+        {
+            CommunicationError?.Invoke(message);
+        }
 
         protected EthernetProtocolBase(ProtocolSettingBase setting, Windows.UI.Core.CoreDispatcher dispatcher)
         {
@@ -290,13 +297,13 @@ namespace UwpHmiToolkit.Protocol
             public double UpperLimit => upperLimit ?? double.MaxValue;
             public double LowerLimit => lowerLimit ?? double.MinValue;
 
-            protected bool asDoubleWords;
+            protected bool asDoubleWords, asFloat;
             public bool AsDoubleWords => asDoubleWords;
-
-            protected bool asFloat;
             public bool AsFloat => asFloat;
+            public bool Use2Channels => asFloat || asDoubleWords;
 
-            public bool Use2Channels => AsFloat || AsDoubleWords;
+            public uint decimalPointPositon;
+            public uint DecimalPointPositon => decimalPointPositon;
 
             public override void DecodeValue(byte[] valueInBytes)
             {
@@ -304,7 +311,7 @@ namespace UwpHmiToolkit.Protocol
                 var length = valueInBytes.Length;
                 if (length == 2 || length == 4)
                 {
-                    Array.Copy(valueInBytes, vs, asDoubleWords ? 4 : 2);
+                    Array.Copy(valueInBytes, vs, AsDoubleWords ? 4 : 2);
                     Value = BitConverter.ToInt32(vs, 0);
                 }
                 else
@@ -339,8 +346,6 @@ namespace UwpHmiToolkit.Protocol
         }
 
         #endregion /DeviceModel
-
-
     }
 
     public abstract class ProtocolSettingBase : AutoBindableBase

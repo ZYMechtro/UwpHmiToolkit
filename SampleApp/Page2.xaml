@@ -1,0 +1,147 @@
+﻿<Page x:Class="SampleApp.Page2"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:local="using:SampleApp"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      mc:Ignorable="d"
+      Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+
+    <Grid>
+        <Grid.Resources>
+            <Style TargetType="StackPanel">
+                <Setter Property="Orientation"
+                        Value="Horizontal" />
+                <Setter Property="Margin"
+                        Value="5" />
+            </Style>
+            <Style TargetType="TextBlock">
+                <Setter Property="MinWidth"
+                        Value="40" />
+                <Setter Property="VerticalAlignment"
+                        Value="Center" />
+            </Style>
+            <Style TargetType="Button">
+                <Setter Property="MinWidth"
+                        Value="100" />
+            </Style>
+        </Grid.Resources>
+        <ListView Padding="5">
+
+            <StackPanel>
+                <TextBlock>MR0</TextBlock>
+                <RepeatButton x:Name="Pb_MR0"
+                              Content="{x:Bind MR0.Value, Mode=OneWay,Converter={StaticResource BoolToStringConverter}}"
+                              Background="{x:Bind MR0.Value, Mode=OneWay, Converter={StaticResource BoolToColorConverter}}"
+                              Click="Pb_MR0_Click" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock>MR1</TextBlock>
+                <RepeatButton x:Name="Pb_MR1"
+                              Content="{x:Bind MR1.Value, Mode=OneWay,Converter={StaticResource BoolToStringConverter}}"
+                              Background="{x:Bind MR1.Value, Mode=OneWay, Converter={StaticResource BoolToColorConverter}}"
+                              Click="Pb_MR1_Click" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock>MR2</TextBlock>
+                <RepeatButton x:Name="Pb_MR2"
+                              Content="{x:Bind MR2.Value, Mode=OneWay,Converter={StaticResource BoolToStringConverter}}"
+                              Background="{x:Bind MR2.Value, Mode=OneWay, Converter={StaticResource BoolToColorConverter}}"
+                              Click="Pb_MR2_Click" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock>MR3</TextBlock>
+                <RepeatButton x:Name="Pb_MR3"
+                              Content="{x:Bind MR3.Value, Mode=OneWay,Converter={StaticResource BoolToStringConverter}}"
+                              Background="{x:Bind MR3.Value, Mode=OneWay, Converter={StaticResource BoolToColorConverter}}"
+                              Click="Pb_MR3_Click" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock>MR4</TextBlock>
+                <RepeatButton x:Name="Pb_MR4"
+                              Content="{x:Bind MR4.Value, Mode=OneWay,Converter={StaticResource BoolToStringConverter}}"
+                              Background="{x:Bind MR4.Value, Mode=OneWay, Converter={StaticResource BoolToColorConverter}}"
+                              Click="Pb_MR4_Click" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock>MR5</TextBlock>
+                <RepeatButton x:Name="Pb_MR5"
+                              Content="{x:Bind MR5.Value, Mode=OneWay,Converter={StaticResource BoolToStringConverter}}"
+                              Background="{x:Bind MR5.Value, Mode=OneWay, Converter={StaticResource BoolToColorConverter}}"
+                              Click="Pb_MR5_Click" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock>MR6</TextBlock>
+                <RepeatButton x:Name="Pb_MR6"
+                              Content="{x:Bind MR6.Value, Mode=OneWay,Converter={StaticResource BoolToStringConverter}}"
+                              Background="{x:Bind MR6.Value, Mode=OneWay, Converter={StaticResource BoolToColorConverter}}"
+                              Click="Pb_MR6_Click" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock>MR7</TextBlock>
+                <RepeatButton x:Name="Pb_MR7"
+                              Content="{x:Bind MR7.Value, Mode=OneWay,Converter={StaticResource BoolToStringConverter}}"
+                              Background="{x:Bind MR7.Value, Mode=OneWay, Converter={StaticResource BoolToColorConverter}}"
+                              Click="Pb_MR7_Click" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock>MR8</TextBlock>
+                <RepeatButton x:Name="Pb_MR8"
+                              Content="{x:Bind MR8.Value, Mode=OneWay,Converter={StaticResource BoolToStringConverter}}"
+                              Background="{x:Bind MR8.Value, Mode=OneWay, Converter={StaticResource BoolToColorConverter}}"
+                              Click="Pb_MR8_Click" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock>MR9</TextBlock>
+                <RepeatButton x:Name="Pb_MR9"
+                              Content="{x:Bind MR9.Value, Mode=OneWay,Converter={StaticResource BoolToStringConverter}}"
+                              Background="{x:Bind MR9.Value, Mode=OneWay, Converter={StaticResource BoolToColorConverter}}"
+                              Click="Pb_MR9_Click" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock>MR10</TextBlock>
+                <RepeatButton x:Name="Pb_MR10"
+                              Content="{x:Bind MR10.Value, Mode=OneWay,Converter={StaticResource BoolToStringConverter}}"
+                              Background="{x:Bind MR10.Value, Mode=OneWay, Converter={StaticResource BoolToColorConverter}}"
+                              Click="Pb_MR10_Click" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock>MR11</TextBlock>
+                <RepeatButton x:Name="Pb_MR11"
+                              Content="{x:Bind MR11.Value, Mode=OneWay,Converter={StaticResource BoolToStringConverter}}"
+                              Background="{x:Bind MR11.Value, Mode=OneWay, Converter={StaticResource BoolToColorConverter}}"
+                              Click="Pb_MR11_Click" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock>MR12</TextBlock>
+                <RepeatButton x:Name="Pb_MR12"
+                              Content="{x:Bind MR12.Value, Mode=OneWay,Converter={StaticResource BoolToStringConverter}}"
+                              Background="{x:Bind MR12.Value, Mode=OneWay, Converter={StaticResource BoolToColorConverter}}"
+                              Click="Pb_MR12_Click" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock>MR13</TextBlock>
+                <RepeatButton x:Name="Pb_MR13"
+                              Content="{x:Bind MR13.Value, Mode=OneWay,Converter={StaticResource BoolToStringConverter}}"
+                              Background="{x:Bind MR13.Value, Mode=OneWay, Converter={StaticResource BoolToColorConverter}}"
+                              Click="Pb_MR13_Click" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock>MR14</TextBlock>
+                <RepeatButton x:Name="Pb_MR14"
+                              Content="{x:Bind MR14.Value, Mode=OneWay,Converter={StaticResource BoolToStringConverter}}"
+                              Background="{x:Bind MR14.Value, Mode=OneWay, Converter={StaticResource BoolToColorConverter}}"
+                              Click="Pb_MR14_Click" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock>MR15</TextBlock>
+                <RepeatButton x:Name="Pb_MR15"
+                              Content="{x:Bind MR15.Value, Mode=OneWay,Converter={StaticResource BoolToStringConverter}}"
+                              Background="{x:Bind MR15.Value, Mode=OneWay, Converter={StaticResource BoolToColorConverter}}"
+                              Click="Pb_MR15_Click" />
+            </StackPanel>
+
+        </ListView>
+
+    </Grid>
+</Page>
