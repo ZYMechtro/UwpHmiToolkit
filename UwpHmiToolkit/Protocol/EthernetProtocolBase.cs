@@ -163,7 +163,7 @@ namespace UwpHmiToolkit.Protocol
         protected readonly Windows.UI.Core.CoreDispatcher CurrentDispatcher;
 
 
-        public virtual void Start() => dispatcherTimer.Start();
+        public virtual void Start() => dispatcherTimer?.Start();
 
         public virtual void Stop() => dispatcherTimer?.Stop();
 
@@ -190,22 +190,28 @@ namespace UwpHmiToolkit.Protocol
         {
             if (!devicesToMonitor.Any(d => d.Name == device.Name))
                 devicesToMonitor.Add(device);
+
             needToRefreshReading = true;
         }
 
         public virtual void RemoveRead(Device device)
         {
             devicesToMonitor.RemoveAll(d => d.Name == device.Name);
+
             needToRefreshReading = true;
         }
 
         public virtual void AddReads(IEnumerable<Device> devices)
         {
             devicesToMonitor.AddRange(devices.Where(d => !devicesToMonitor.Any(m => m.Name == d.Name)));
+
             needToRefreshReading = true;
         }
 
-        public virtual void RemoveReads() => devicesToMonitor.Clear();
+        public virtual void RemoveReads()
+        {
+            devicesToMonitor.Clear();
+        }
 
         public virtual void ReveresBit(BitDevice bitDevice) => devicesToWrite.Add(new BitToWrite(bitDevice, !bitDevice.Value));
 
@@ -235,7 +241,6 @@ namespace UwpHmiToolkit.Protocol
         public event CommunicationErrorHandler CommunicationError;
         protected virtual void RaiseCommError(string message)
         {
-            ChangeOnlineStatus(false);
             CommunicationError?.Invoke(message);
         }
 
@@ -296,7 +301,7 @@ namespace UwpHmiToolkit.Protocol
             public bool AsDoubleWords => asDoubleWords;
             public bool AsFloat => asFloat;
             public bool Use2Channels => asFloat || asDoubleWords;
-            
+
             public uint decimalPointPositon;
             public uint DecimalPointPositon => decimalPointPositon;
 

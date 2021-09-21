@@ -185,7 +185,6 @@ namespace UwpHmiToolkit.Protocol.McProtocol
             {
                 if (unhandledSerialIndexPairs.Count > 0)
                     RaiseCommError($"LostResponseData,count: {unhandledSerialIndexPairs.Count}.");
-
                 unhandledSerialIndexPairs.Clear();
                 for (int i = 0; i < splitedReadingCmds.Count; i++)
                 {
@@ -349,11 +348,6 @@ namespace UwpHmiToolkit.Protocol.McProtocol
                                 }
 
                             });
-#if DEBUG
-                            //var str = device is McWordDevice a ? a.Value.ToString() : (device as McBitDevice).Value.ToString();
-                            //RaiseCommError($"Read {device.Name}: {str}");
-                            //Debug.WriteLine($"Read {device.Name}: {str}");
-#endif
                         }
                         unhandledSerialIndexPairs.Remove(sN);
                     }
@@ -429,7 +423,7 @@ namespace UwpHmiToolkit.Protocol.McProtocol
 
         private static IEnumerable<Dictionary<T, int>> SplitDicitionay<T>(Dictionary<T, int> totalDevices, int size = randomReadsMaxCount)
         {
-            for (int i = 0; i < totalDevices.Count; i += size)
+            for (int i = 0; i <= totalDevices.Max(d => d.Value); i++)
             {
                 var devices = from pair in totalDevices
                               where pair.Value >= i * size
@@ -437,6 +431,7 @@ namespace UwpHmiToolkit.Protocol.McProtocol
                               orderby pair.Value
                               select pair;
                 yield return devices.ToDictionary(p => p.Key, p => p.Value);
+                i = devices.Max(d => d.Value);
             }
         }
 

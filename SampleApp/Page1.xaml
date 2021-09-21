@@ -1,0 +1,112 @@
+﻿<Page
+    x:Class="SampleApp.Page1"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:SampleApp"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+    <Grid>
+        <Grid.Resources>
+            <Style TargetType="StackPanel">
+                <Setter Property="Orientation"
+                        Value="Horizontal" />
+                <Setter Property="Margin"
+                        Value="5" />
+            </Style>
+            <Style TargetType="TextBlock">
+                <Setter Property="MinWidth"
+                        Value="100" />
+            </Style>
+            <Style TargetType="Button">
+                <Setter Property="MinWidth"
+                        Value="100" />
+            </Style>
+        </Grid.Resources>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+
+        <StackPanel Orientation="Vertical"
+                    Padding="10">
+            <StackPanel>
+                <TextBlock>DM100</TextBlock>
+                <Button x:Name="Pb_DM100"
+                        Content="{x:Bind DM100.Value, Mode=OneWay,Converter={StaticResource IntToStringConverter}}"
+                        Click="Pb_DM100_Click" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock>DM200</TextBlock>
+                <Button x:Name="Pb_DM200"
+                        Content="{x:Bind DM200.Value, Mode=OneWay,Converter={StaticResource IntToStringConverter}}"
+                        Click="Pb_DM200_Click" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock>EM100</TextBlock>
+                <Button x:Name="Pb_EM100"
+                        Content="{x:Bind EM100.Value, Mode=OneWay,Converter={StaticResource IntToStringConverter}}"
+                        Click="Pb_EM100_Click" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock>EM200</TextBlock>
+                <Button x:Name="Pb_EM200"
+                        Content="{x:Bind EM200.Value, Mode=OneWay,Converter={StaticResource IntToStringConverter}}"
+                        Click="Pb_EM200_Click" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock>W0</TextBlock>
+                <Button x:Name="Pb_W0"
+                        Content="{x:Bind W0.Value, Mode=OneWay,Converter={StaticResource IntToStringConverter}}"
+                        Click="Pb_W0_Click" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock>WFF</TextBlock>
+                <Button x:Name="Pb_WFE"
+                        Content="{x:Bind WFE.Value, Mode=OneWay,Converter={StaticResource IntTypeFloatToStringConverter}}"
+                        Click="Pb_WFE_Click"
+                        Width="Auto" />
+            </StackPanel>
+        </StackPanel>
+
+        <StackPanel Grid.Column="1"
+                    Orientation="Vertical"
+                    Padding="10">
+            <StackPanel>
+                <TextBlock>R0</TextBlock>
+                <Button x:Name="Pb_R0"
+                        Content="{x:Bind R0.Value, Mode=OneWay,Converter={StaticResource BoolToStringConverter}}"
+                        Click="Pb_R0_Click" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock>R515</TextBlock>
+                <Button x:Name="Pb_R515"
+                        Content="{x:Bind R515.Value, Mode=OneWay,Converter={StaticResource BoolToStringConverter}}"
+                        Click="Pb_R515_Click" />
+            </StackPanel>
+
+            <StackPanel>
+                <TextBlock>MR515</TextBlock>
+                <Button x:Name="Pb_MR515"
+                        Content="{x:Bind MR515.Value, Mode=OneWay,Converter={StaticResource BoolToStringConverter}}"
+                        Click="Pb_MR515_Click" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock>B0</TextBlock>
+                <Button x:Name="Pb_B0"
+                        Content="{x:Bind B0.Value, Mode=OneWay,Converter={StaticResource BoolToStringConverter}}"
+                        Click="Pb_B0_Click" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock>BFF</TextBlock>
+                <Button x:Name="Pb_BFF"
+                        Content="{x:Bind BFF.Value, Mode=OneWay,Converter={StaticResource BoolToStringConverter}}"
+                        Click="Pb_BFF_Click" />
+            </StackPanel>
+
+        </StackPanel>
+
+
+    </Grid>
+</Page>
