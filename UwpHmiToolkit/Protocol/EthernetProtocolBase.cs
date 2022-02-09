@@ -108,11 +108,18 @@ namespace UwpHmiToolkit.Protocol
 
             if (icp?.NetworkAdapter == null) return null;
             var hns = NetworkInformation.GetHostNames();
+
+            var b = hns.Any(hn =>
+                     hn.Type == HostNameType.Ipv4 &&
+                     hn.IPInformation?.NetworkAdapter != null &&
+                     //hn.IPInformation.NetworkAdapter.NetworkAdapterId == icp.NetworkAdapter.NetworkAdapterId &&
+                     hn.CanonicalName.Contains(match));
+            if (!b) return null;
             var hostname =
                 hns.First(hn =>
                     hn.Type == HostNameType.Ipv4 &&
                     hn.IPInformation?.NetworkAdapter != null &&
-                    hn.IPInformation.NetworkAdapter.NetworkAdapterId == icp.NetworkAdapter.NetworkAdapterId &&
+                    //hn.IPInformation.NetworkAdapter.NetworkAdapterId == icp.NetworkAdapter.NetworkAdapterId &&
                     hn.CanonicalName.Contains(match));
 
             return hostname?.CanonicalName;

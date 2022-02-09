@@ -421,9 +421,11 @@ namespace UwpHmiToolkit.Protocol.McProtocol
             }
         }
 
+        //TODO: Confirm
         private static IEnumerable<Dictionary<T, int>> SplitDicitionay<T>(Dictionary<T, int> totalDevices, int size = randomReadsMaxCount)
         {
-            for (int i = 0; i <= totalDevices.Max(d => d.Value); i++)
+            var j = totalDevices.Max(d => d.Value)/size;
+            for (int i = 0; i <= j; i++)
             {
                 var devices = from pair in totalDevices
                               where pair.Value >= i * size
@@ -431,7 +433,6 @@ namespace UwpHmiToolkit.Protocol.McProtocol
                               orderby pair.Value
                               select pair;
                 yield return devices.ToDictionary(p => p.Key, p => p.Value);
-                i = devices.Max(d => d.Value);
             }
         }
 
