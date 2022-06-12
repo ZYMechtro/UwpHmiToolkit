@@ -210,6 +210,12 @@ namespace UwpHmiToolkit.Protocol
 
         public virtual void AddReads(IEnumerable<Device> devices)
         {
+            var result = from device in devices
+                         where device is null
+                         select nameof(device);
+            if (result.Count() > 0)
+                throw new ArgumentNullException();
+
             devicesToMonitor.AddRange(devices.Where(d => !devicesToMonitor.Any(m => m.Name == d.Name)));
 
             needToRefreshReading = true;
