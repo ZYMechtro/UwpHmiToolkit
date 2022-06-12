@@ -70,6 +70,9 @@
                 <Button x:Name="Button_Stop"
                         Content="Stop"
                         Click="Button_Stop_Click" />
+                <Button x:Name="Button_Send"
+                        Content="Send"
+                        Click="Button_Send_Click" />
             </StackPanel>
         </StackPanel>
 

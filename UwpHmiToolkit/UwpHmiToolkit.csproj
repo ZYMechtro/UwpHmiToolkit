@@ -132,11 +132,13 @@
     <RestoreProjectStyle>PackageReference</RestoreProjectStyle>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="DataTool\MyTool.cs" />
     <Compile Include="Protocol\McProtocol.cs" />
     <Compile Include="Protocol\EthernetProtocolBase.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Semi\Hsms.cs" />
+    <Compile Include="Semi\SecsII.cs" />
     <Compile Include="Semi\Semi.cs" />
-    <Compile Include="Semi\Semi2.cs" />
     <Compile Include="UiConverter\UiConverter.cs" />
     <Compile Include="ViewModel\ViewModel.cs" />
   </ItemGroup>

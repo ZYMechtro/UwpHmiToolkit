@@ -6,14 +6,17 @@ using System.Text;
 using System.Threading.Tasks;
 using UwpHmiToolkit.ViewModel;
 using Windows.Networking;
+using System.Net.Sockets;
 using Windows.Networking.Sockets;
+using Windows.Storage.Streams;
 using Windows.UI.Core;
+using System.Net;
 
 namespace UwpHmiToolkit.Semi
 {
-    public partial class Semi : AutoBindableBase
+    public class Semi : AutoBindableBase
     {
-        public enum DataItemType
+        public enum DataItemType : ushort
         {
             List = 0b0000_00,
             Binary = 0b0010_00,
@@ -34,10 +37,14 @@ namespace UwpHmiToolkit.Semi
 
         private HsmsSetting HsmsSetting { get; set; }
 
-        protected StreamSocket tcpSocket;
+        protected StreamSocket tcpSocketServer, tcpSocketClient;
+        protected Stream inputStream, outputStream;
 
-        protected StreamWriter streamWriter;
-        protected StreamReader streamReader;
+        protected StreamReader reader;
+        protected StreamWriter writer;
+
+        //protected StreamWriter streamWriter;
+        //protected StreamReader streamReader;
 
         private CoreDispatcher Dispatcher;
 
@@ -49,32 +56,33 @@ namespace UwpHmiToolkit.Semi
         public async void Start()
         {
             StartServer();
-            //await Task.Delay(500);
-            //StartClient();
+
+            await Task.Delay(500);
+
+            StartClient();
         }
 
-        public void Stop() => tcpSocket?.Dispose();
+        public void Stop()
+        {
+            tcpSocketServer?.Dispose();
+            tcpSocketClient?.Dispose();
+        }
+
 
         private async void StartServer()
         {
             try
             {
                 var streamSocketListener = new Windows.Networking.Sockets.StreamSocketListener();
-
-                // The ConnectionReceived event is raised when connections are received.
                 streamSocketListener.ConnectionReceived += this.StreamSocketListener_ConnectionReceived;
-
-                // Start listening for incoming TCP connections on the specified port. You can specify any port that's not currently in use.
+                streamSocketListener.Control.KeepAlive = true;
                 await streamSocketListener.BindServiceNameAsync(HsmsSetting.LocalPort);
-                //await streamSocketListener.BindEndpointAsync(new HostName("localhost"), HsmsSetting.LocalPort);
 
-                //this.serverListBox.Items.Add("server is listening...");
                 ServerMessageUpdate("server is listening...");
             }
             catch (Exception ex)
             {
-                SocketErrorStatus webErrorStatus = SocketError.GetStatus(ex.GetBaseException().HResult);
-                //this.serverListBox.Items.Add(webErrorStatus.ToString() != "Unknown" ? webErrorStatus.ToString() : ex.Message);
+                SocketErrorStatus webErrorStatus = Windows.Networking.Sockets.SocketError.GetStatus(ex.GetBaseException().HResult);
                 if (webErrorStatus == SocketErrorStatus.AddressAlreadyInUse)
                 {
                     ServerMessageUpdate(webErrorStatus.ToString() != "Unknown" ? webErrorStatus.ToString() : ex.Message);
@@ -87,77 +95,79 @@ namespace UwpHmiToolkit.Semi
             string request;
             using (var streamReader = new StreamReader(args.Socket.InputStream.AsStreamForRead()))
             {
-                request = await streamReader.ReadLineAsync();
-            }
-
-            // Echo the request back as the response.
-            using (Stream outputStream = args.Socket.OutputStream.AsStreamForWrite())
-            {
-                using (var streamWriter = new StreamWriter(outputStream))
+                while (true)
                 {
-                    await streamWriter.WriteLineAsync(request);
-                    await streamWriter.FlushAsync();
+                    request = await streamReader.ReadLineAsync();
+                    if (request != null)
+                        ServerMessageUpdate($"Input: {request}");
+                    else
+                    {
+                        await Task.Delay(10000);
+                    }
                 }
             }
-
             sender.Dispose();
-
-            ServerMessageUpdate($"server got some message...: {request}");
-
         }
 
         private async void StartClient()
         {
+            TcpClient client = new TcpClient(HsmsSetting.TargetIpAddress, int.Parse(HsmsSetting.TargetPort));
+            client.Close();
+
+            tcpSocketClient?.Dispose();
             try
             {
-                // Create the StreamSocket and establish a connection to the echo server.
-                using (var streamSocket = new Windows.Networking.Sockets.StreamSocket())
-                {
-                    // The server hostname that we will be establishing a connection to. In this example, the server and client are in the same process.
-                    var hostName = new HostName(HsmsSetting.LocalIpAddress);
+                tcpSocketClient = new Windows.Networking.Sockets.StreamSocket();
+                var hostName = new HostName(HsmsSetting.LocalIpAddress);
+                ClientMessageUpdate("client is trying to connect...");
+                await tcpSocketClient.ConnectAsync(hostName, HsmsSetting.TargetPort);
+                ClientMessageUpdate("client connected");
 
-                    ClientMessageUpdate("client is trying to connect...");
-
-                    //await streamSocket.ConnectAsync(hostName, HsmsSetting.TargetPort);
-                    await streamSocket.ConnectAsync(hostName, "5000");
-
-                    ClientMessageUpdate("client connected");
-
-                    // Send a request to the echo server.
-                    string request = "Hello, World!";
-                    using (Stream outputStream = streamSocket.OutputStream.AsStreamForWrite())
-                    {
-                        using (var streamWriter = new StreamWriter(outputStream))
-                        {
-                            await streamWriter.WriteLineAsync(request);
-                            await streamWriter.FlushAsync();
-                        }
-                    }
-
-                    ClientMessageUpdate(string.Format("client sent the request: \"{0}\"", request));
-
-                    // Read data from the echo server.
-                    string response;
-                    using (Stream inputStream = streamSocket.InputStream.AsStreamForRead())
-                    {
-                        using (StreamReader streamReader = new StreamReader(inputStream))
-                        {
-                            response = await streamReader.ReadLineAsync();
-                        }
-                    }
-
-                    ClientMessageUpdate(string.Format("client received the response: \"{0}\" ", response));
-                }
-
-                ClientMessageUpdate("client closed its socket");
             }
             catch (Exception ex)
             {
                 Windows.Networking.Sockets.SocketErrorStatus webErrorStatus = Windows.Networking.Sockets.SocketError.GetStatus(ex.GetBaseException().HResult);
                 ClientMessageUpdate(webErrorStatus.ToString() != "Unknown" ? webErrorStatus.ToString() : ex.Message);
             }
-        }
 
+
+
+        }
+        string request = "Hello world!";
+        public async void Send(byte[] hsmsMessage)
+        {
+            if (tcpSocketClient != null)
+            {
+                outputStream = tcpSocketClient.OutputStream.AsStreamForWrite();
+                writer = new StreamWriter(outputStream);
+                request += "0";
+                await writer.WriteLineAsync(request);
+                await writer.FlushAsync();
+
+                ClientMessageUpdate(string.Format("client sent the request: \"{0}\"", request));
+            }
+
+            if (tcpSocketClient != null && false)
+            {
+
+                // Send a request to the echo server.
+                outputStream = tcpSocketClient.OutputStream.AsStreamForWrite();
+                //await outputStream.WriteAsync(hsmsMessage, 0, hsmsMessage.Length);
+                //await outputStream.FlushAsync();
+
+
+                //ClientMessageUpdate(string.Format("client sent the request: \"{0}, Port {1} to {2} \"", BitConverter.ToString(hsmsMessage), tcpSocketClient.Information.LocalPort, tcpSocketClient.Information.RemotePort));
+
+
+                //Send a request to the echo server.
+                string request = "Hello, World!";
+                //writer = new StreamWriter(outputStream);
+                // await writer.WriteLineAsync(request);
+                //await writer.FlushAsync();
+
+                ClientMessageUpdate(string.Format("client sent the request: \"{0}\"", request));
+            }
+        }
 
 
         public delegate void ServerMessageHandler(string message);
@@ -168,42 +178,5 @@ namespace UwpHmiToolkit.Semi
     }
 
 
-    public class HsmsSetting : AutoBindableBase
-    {
-        public enum ConnectionMode { Passive, Active };
 
-        public ConnectionMode Mode { get; set; } = ConnectionMode.Passive;
-
-        /// <summary>
-        /// Reply Timeout in sec.
-        /// </summary>
-        public ushort T3 { get; set; } = 30;
-
-        /// <summary>
-        /// Connection Separation Timeout in sec.
-        /// </summary>
-        public ushort T5 { get; set; } = 10;
-
-        /// <summary>
-        /// Control Transaction Timeout in sec.
-        /// </summary>
-        public ushort T6 { get; set; } = 10;
-
-        /// <summary>
-        /// Not Selected Timeout in sec.
-        /// </summary>
-        public ushort T7 { get; set; } = 10;
-
-        /// <summary>
-        /// Network Timeout in sec.
-        /// </summary>
-        public ushort T8 { get; set; } = 10;
-
-        public byte[] DeviceId { get; set; } = new byte[2] { 0x00, 0x00 };
-
-        public string TargetIpAddress { get; } = "127.0.0.1";
-        public string LocalIpAddress { get; } = "127.0.0.1";
-        public string TargetPort { get; } = "5000";
-        public string LocalPort { get; } = "5000";
-    }
 }
