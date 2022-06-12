@@ -83,16 +83,24 @@ namespace UwpHmiToolkit.Semi
             {
                 if (IsHsmsMessage)
                 {
+                    byte[] bsLength = BitConverter.GetBytes(MessageLength);
+                    byte[] bsId = BitConverter.GetBytes(DeviceId);
+                    byte[] bsSb = BitConverter.GetBytes(SystemBytes);
+                    if (BitConverter.IsLittleEndian)
+                    {
+                        Array.Reverse(bsLength);
+                        Array.Reverse(bsId);
+                        Array.Reverse(bsSb);
+                    }
                     return MyTool.CombineBytes(
-                        BitConverter.GetBytes(MessageLength),
-                        BitConverter.GetBytes(DeviceId),
+                        bsLength,
+                        bsId,
                         new byte[1] { Stream },
                         new byte[1] { Function },
                         new byte[1] { Ptype },
                         new byte[1] { Stype },
-                        BitConverter.GetBytes(SystemBytes),
-                        MessageText,
-                        new byte[2] { 0x0d, 0x0a }
+                        bsSb,
+                        MessageText
                          );
                 }
                 else

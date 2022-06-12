@@ -11,6 +11,7 @@ using Windows.Networking.Sockets;
 using Windows.Storage.Streams;
 using Windows.UI.Core;
 using System.Net;
+using UwpHmiToolkit.DataTool;
 
 namespace UwpHmiToolkit.Semi
 {
@@ -40,8 +41,8 @@ namespace UwpHmiToolkit.Semi
         protected StreamSocket tcpSocketServer, tcpSocketClient;
         protected Stream inputStream, outputStream;
 
-        protected StreamReader reader;
-        protected StreamWriter writer;
+        //protected DataReader reader;
+        //protected DataWriter writer;
 
         //protected StreamWriter streamWriter;
         //protected StreamReader streamReader;
@@ -71,6 +72,81 @@ namespace UwpHmiToolkit.Semi
 
         private async void StartServer()
         {
+
+#if false
+
+            TcpListener server = null;
+            try
+            {
+                // Set the TcpListener on port 13000.
+                Int32 port = 5000;
+                IPAddress localAddr = IPAddress.Parse("127.0.0.1");
+
+                // TcpListener server = new TcpListener(port);
+                server = new TcpListener(localAddr, port);
+
+                // Start listening for client requests.
+                server.Start();
+
+                // Buffer for reading data
+                Byte[] bytes = new Byte[256];
+                String data = null;
+
+                // Enter the listening loop.
+                while (true)
+                {
+                    ServerMessageUpdate("Waiting for a connection... ");
+
+                    // Perform a blocking call to accept requests.
+                    // You could also use server.AcceptSocket() here.
+                    TcpClient client = await server.AcceptTcpClientAsync();
+                    ServerMessageUpdate("Connected!");
+
+                    data = null;
+
+                    // Get a stream object for reading and writing
+                    NetworkStream stream = client.GetStream();
+
+                    int i;
+
+                    // Loop to receive all the data sent by the client.
+                    while ((i = stream.Read(bytes, 0, bytes.Length)) != 0)
+                    {
+                        
+                        ServerMessageUpdate($"Received: {BitConverter.ToString(bytes)}");
+
+                        // Process the data sent by the client.
+                        //data = data.ToUpper();
+
+                        //byte[] msg = System.Text.Encoding.ASCII.GetBytes(data);
+
+                        // Send back a response.
+                        //stream.Write(msg, 0, msg.Length);
+                        //ServerMessageUpdate($"Sent: {data}");
+                        await Task.Delay(3000);
+                    }
+
+                    // Shutdown and end connection
+                    client.Close();
+
+                    await Task.Delay(3000);
+                }
+            }
+            catch (SocketException e)
+            {
+                Console.WriteLine("SocketException: {0}", e);
+            }
+            finally
+            {
+                // Stop listening for new clients.
+                server.Stop();
+            }
+
+            ServerMessageUpdate("\nHit enter to continue...");
+            
+#endif
+
+#if true
             try
             {
                 var streamSocketListener = new Windows.Networking.Sockets.StreamSocketListener();
@@ -78,7 +154,7 @@ namespace UwpHmiToolkit.Semi
                 streamSocketListener.Control.KeepAlive = true;
                 await streamSocketListener.BindServiceNameAsync(HsmsSetting.LocalPort);
 
-                ServerMessageUpdate("server is listening...");
+                ServerMessageUpdate("Server is listening...");
             }
             catch (Exception ex)
             {
@@ -88,25 +164,69 @@ namespace UwpHmiToolkit.Semi
                     ServerMessageUpdate(webErrorStatus.ToString() != "Unknown" ? webErrorStatus.ToString() : ex.Message);
                 }
             }
+#endif
         }
 
         private async void StreamSocketListener_ConnectionReceived(StreamSocketListener sender, StreamSocketListenerConnectionReceivedEventArgs args)
         {
-            string request;
-            using (var streamReader = new StreamReader(args.Socket.InputStream.AsStreamForRead()))
+
+
+#if false
+            byte[] request = new byte[0];
+            byte[] bytes1 = null;
+            while (true)
+            {
+                using (DataReader reader = new DataReader(args.Socket.InputStream))
+                {
+                    //reader.InputStreamOptions = InputStreamOptions.;
+
+                    byte[] buffer = new byte[0];
+                    await reader.LoadAsync(1);
+                    while (reader.UnconsumedBufferLength > 0)
+                    {
+                        bytes1 = new byte[reader.UnconsumedBufferLength];
+                        reader.ReadBytes(bytes1);
+                        request = MyTool.CombineBytes(request, bytes1);
+                        ServerMessageUpdate($"Input: {BitConverter.ToString(request)}");
+                        await reader.LoadAsync(reader.UnconsumedBufferLength);
+                    }
+                    reader.DetachStream();
+                    
+                    if (request != null && request.Length != 0)
+                    {
+                        ServerMessageUpdate($"Input: {BitConverter.ToString(request)}");
+                    }
+                    else
+                    {
+                        await Task.Delay(100);
+                    }
+                }
+            }
+
+#endif
+
+#if true
+            using (Stream inputStream = args.Socket.InputStream.AsStreamForRead())
             {
                 while (true)
                 {
-                    request = await streamReader.ReadLineAsync();
-                    if (request != null)
-                        ServerMessageUpdate($"Input: {request}");
+                    byte[] buffer = new byte[4096];
+
+                    var length = await inputStream.ReadAsync(buffer, 0, 4096);
+                    if (length > 0)
+                    {
+                        var request = new byte[length];
+                        Array.Copy(buffer, 0, request, 0, length);
+                        ServerMessageUpdate($"Input: {BitConverter.ToString(request)}");
+                    }
                     else
                     {
-                        await Task.Delay(10000);
+                        await Task.Delay(500);
                     }
                 }
             }
             sender.Dispose();
+#endif
         }
 
         private async void StartClient()
@@ -119,9 +239,9 @@ namespace UwpHmiToolkit.Semi
             {
                 tcpSocketClient = new Windows.Networking.Sockets.StreamSocket();
                 var hostName = new HostName(HsmsSetting.LocalIpAddress);
-                ClientMessageUpdate("client is trying to connect...");
+                ClientMessageUpdate("Client is trying to connect...");
                 await tcpSocketClient.ConnectAsync(hostName, HsmsSetting.TargetPort);
-                ClientMessageUpdate("client connected");
+                ClientMessageUpdate("Client connected");
 
             }
             catch (Exception ex)
@@ -133,18 +253,15 @@ namespace UwpHmiToolkit.Semi
 
 
         }
-        string request = "Hello world!";
         public async void Send(byte[] hsmsMessage)
         {
             if (tcpSocketClient != null)
             {
                 outputStream = tcpSocketClient.OutputStream.AsStreamForWrite();
-                writer = new StreamWriter(outputStream);
-                request += "0";
-                await writer.WriteLineAsync(request);
-                await writer.FlushAsync();
+                await outputStream.WriteAsync(hsmsMessage, 0, hsmsMessage.Length);
+                await outputStream.FlushAsync();
 
-                ClientMessageUpdate(string.Format("client sent the request: \"{0}\"", request));
+                ClientMessageUpdate(string.Format($"Sent : {BitConverter.ToString(hsmsMessage)}"));
             }
 
             if (tcpSocketClient != null && false)
