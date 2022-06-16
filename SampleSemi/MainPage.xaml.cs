@@ -57,8 +57,8 @@ namespace SampleSemi
 
         private void Button_Send_Click(object sender, RoutedEventArgs e)
         {
-            byte[] msg = new byte[] { 0x01, 0x02, 0x03 };
-            MySemi.Send(HsmsMessage.DataMessage(05, 06, msg, null).MessageToSend);
+            byte[] msg = new byte[] { 0x0d, 0x0a};
+            MySemi.Send(HsmsMessage.DataMessage(0x81, 01, null, null).MessageToSend);
             
         }
     }

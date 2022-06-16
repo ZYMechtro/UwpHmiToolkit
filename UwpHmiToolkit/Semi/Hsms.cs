@@ -12,6 +12,7 @@ namespace UwpHmiToolkit.Semi
     {
         public enum ConnectionMode { Passive, Active };
 
+
         public ConnectionMode Mode { get; set; } = ConnectionMode.Passive;
 
         /// <summary>
@@ -62,15 +63,15 @@ namespace UwpHmiToolkit.Semi
             SeparateReq = 9,
         };
 
-        public static uint CurrentSystemBytes;
+        public static uint CurrentSystemBytes=0x1562daad;
 
-        public uint MessageLength => IsHsmsMessage ? 10 + (uint)MessageText?.Length : 0;
+        public uint MessageLength => IsHsmsMessage ? 10 + (MessageText is null ? 0 : (uint)MessageText.Length) : (uint)0;
 
-        public ushort DeviceId { get; } = 01;
-        public byte Stream { get; } = 01;
-        public byte Function { get; } = 01;
+        public ushort DeviceId { get; } = 0;
+        public byte Stream { get; } = 0;
+        public byte Function { get; } = 0;
 
-        public const byte Ptype = 01;
+        public const byte Ptype = 0;
         public byte Stype { get; } = (byte)Stypes.DataMessage;
         public uint SystemBytes { get; } = 01;
         public byte[] MessageText { get; } = null;
@@ -111,7 +112,7 @@ namespace UwpHmiToolkit.Semi
         }
 
         public static HsmsMessage DataMessage(byte s, byte f, byte[] text = null, byte? sourceSystemBytes = null)
-            => new HsmsMessage(0, s, f, (byte)Stypes.DataMessage, sourceSystemBytes, text);
+            => new HsmsMessage(0x0000, s, f, (byte)Stypes.DataMessage, sourceSystemBytes, text);
 
 
 

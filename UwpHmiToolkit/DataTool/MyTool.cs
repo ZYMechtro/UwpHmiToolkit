@@ -18,12 +18,15 @@ namespace UwpHmiToolkit.DataTool
 
         public static byte[] CombineBytes(params byte[][] arrays)
         {
-            byte[] ret = new byte[arrays.Sum(x => x.Length)];
+            byte[] ret = new byte[arrays.Where(x => x != null).Sum(x => x.Length)];
             int offset = 0;
             foreach (byte[] data in arrays)
             {
-                Buffer.BlockCopy(data, 0, ret, offset, data.Length);
-                offset += data.Length;
+                if (data != null)
+                {
+                    Buffer.BlockCopy(data, 0, ret, offset, data.Length);
+                    offset += data.Length;
+                }
             }
             return ret;
         }
