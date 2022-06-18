@@ -13,6 +13,7 @@ using Windows.UI.Core;
 using System.Net;
 using UwpHmiToolkit.DataTool;
 using System.Threading;
+using static UwpHmiToolkit.Semi.HsmsMessage;
 
 namespace UwpHmiToolkit.Semi
 {
@@ -21,11 +22,17 @@ namespace UwpHmiToolkit.Semi
 
         private HsmsSetting HsmsSetting { get; set; }
 
-        protected StreamSocket tcpSocketClient;
-        protected Stream inputStream, outputStream;
+        protected StreamSocket tcpSocketClient, tcpSocketServer;
+        protected Stream inputStreamClient, outputStreamClient;
+        protected Stream inputStreamServer, outputStreamServer;
+
+        bool waitingReplyClient = false;
+        bool waitingReplyServer = false;
+
 
         CancellationTokenSource cts;
 
+        public State CurrentState { get; private set; }
 
         private CoreDispatcher Dispatcher;
 
@@ -40,7 +47,7 @@ namespace UwpHmiToolkit.Semi
 
             await Task.Delay(500);
 
-            StartClient();
+            //StartClient();
         }
 
         public void Stop()
@@ -73,29 +80,119 @@ namespace UwpHmiToolkit.Semi
 
         private async void StreamSocketListener_ConnectionReceived(StreamSocketListener sender, StreamSocketListenerConnectionReceivedEventArgs args)
         {
-
-            using (Stream inputStream = args.Socket.InputStream.AsStreamForRead())
+            if (CurrentState != State.Selected)
             {
-                while (true)
+                if (CurrentState == State.NotConnected)
                 {
-                    byte[] buffer = new byte[4096];
+                    CurrentState = State.NotSelected;
+                    ServerMessageUpdate($"New Connect coming, State: [NotSelected]");
+                }
 
-                    var length = await inputStream.ReadAsync(buffer, 0, 4096);
-                    if (length > 0)
+                using (var inputStream = args.Socket.InputStream.AsStreamForRead())
+                {
+                    var outputStream = args.Socket.OutputStream.AsStreamForWrite();
+                    bool separate = false;
+                    while (!separate)
                     {
-                        var request = new byte[length];
-                        Array.Copy(buffer, 0, request, 0, length);
-                        ServerMessageUpdate($"Input: {BitConverter.ToString(request)}");
-                    }
-                    else
-                    {
-                        if (cts.IsCancellationRequested)
+                        byte[] buffer = new byte[4096];
+
+                        try
                         {
-                            break;
+                            var length = await inputStream.ReadAsync(buffer, 0, 4096);
+                            if (length > 0)
+                            {
+                                var source = new byte[length];
+                                Array.Copy(buffer, 0, source, 0, length);
+
+                                if (TryParseHsms(source, out var request))
+                                {
+                                    switch (request.SType)
+                                    {
+                                        case STypes.SelectReq:
+                                            if (CurrentState == State.NotSelected)
+                                            {
+                                                ServerSend(outputStream, ControlMessageSecondary(request, STypes.SelectRsp));
+                                                CurrentState = State.Selected;
+                                            }
+                                            else
+                                                ServerSend(outputStream, RejectControlMessage(request, 1));
+                                            break;
+                                        case STypes.LinktestReq:
+                                            if (CurrentState == State.Selected)
+                                                ServerSend(outputStream, ControlMessageSecondary(request, STypes.LinktestRsp));
+                                            else
+                                                ServerSend(outputStream, RejectControlMessage(request, 2));
+                                            break;
+                                        case STypes.DeselectReq:
+                                            if (CurrentState == State.Selected)
+                                            {
+                                                ServerSend(outputStream, ControlMessageSecondary(request, STypes.DeselectRsp));
+                                                CurrentState = State.NotSelected;
+                                            }
+                                            else
+                                                ServerSend(outputStream, RejectControlMessage(request, 3));
+                                            break;
+
+                                        case STypes.SeparateReq:
+                                            separate = true;
+                                            break;
+
+                                        case STypes.DataMessage:
+                                            HandleDataMessageServer();
+                                            break;
+
+                                        default: break;
+                                    }
+                                }
+                                else
+                                {
+                                    //Echo
+                                    using (StreamWriter writer = new StreamWriter(outputStream))
+                                    {
+                                        await writer.WriteLineAsync("Message received is not HSMS message. Bye.");
+                                        break;
+                                    }
+                                }
+
+
+                                ServerMessageUpdate($"Input: {BitConverter.ToString(source)}");
+                            }
+                            else
+                            {
+                                if (cts.IsCancellationRequested)
+                                {
+                                    break;
+                                }
+                                switch (CurrentState)
+                                {
+                                    case State.NotSelected:
+                                        await Task.Delay(HsmsSetting.T7 * 1000);
+                                        if (CurrentState == State.NotSelected)
+                                        {
+                                            ServerMessageUpdate($"NotSelected timeout (T7), State: [NotConnected]");
+                                            CurrentState = State.NotConnected;
+                                            separate = true;
+                                        }
+                                        break;
+                                    case State.Selected:
+                                        if (waitingReplyServer)
+                                        {
+                                            await Task.Delay(HsmsSetting.T3 * 1000);
+                                            if (waitingReplyServer)
+                                                ServerMessageUpdate($"Server wait reply timeout.");
+                                        }
+                                        break;
+
+                                    default:
+                                        break;
+                                }
+                                await Task.Delay(1000);
+                            }
                         }
-                        await Task.Delay(10000);
+                        catch { }
                     }
                 }
+                CurrentState = State.NotConnected;
             }
             sender.Dispose();
         }
@@ -109,10 +206,13 @@ namespace UwpHmiToolkit.Semi
             try
             {
                 tcpSocketClient = new Windows.Networking.Sockets.StreamSocket();
+                tcpSocketClient.Control.KeepAlive = true;
                 var hostName = new HostName(HsmsSetting.LocalIpAddress);
                 ClientMessageUpdate("Client is trying to connect...");
                 await tcpSocketClient.ConnectAsync(hostName, HsmsSetting.TargetPort);
                 ClientMessageUpdate("Client connected");
+                outputStreamClient = tcpSocketClient.OutputStream.AsStreamForWrite();
+                outputStreamClient.WriteTimeout = HsmsSetting.T8 * 1000;
 
             }
             catch (Exception ex)
@@ -122,18 +222,69 @@ namespace UwpHmiToolkit.Semi
             }
         }
 
-        public async void Send(byte[] hsmsMessage)
+        public async void ClientSend(HsmsMessage hsmsMessage)
         {
-            if (tcpSocketClient != null)
+            if (tcpSocketClient != null && outputStreamClient != null)
             {
-                outputStream = tcpSocketClient.OutputStream.AsStreamForWrite();
-                
-                await outputStream.WriteAsync(hsmsMessage, 0, hsmsMessage.Length);
-                await outputStream.FlushAsync();
+                try
+                {
+                    var msg = hsmsMessage.MessageToSend;
+                    await outputStreamClient.WriteAsync(msg, 0, msg.Length);
+                    await outputStreamClient.FlushAsync();
+                    ClientMessageUpdate(string.Format($"Sent : {BitConverter.ToString(msg)}"));
 
-                ClientMessageUpdate(string.Format($"Sent : {BitConverter.ToString(hsmsMessage)}"));
+                    inputStreamClient = tcpSocketClient.InputStream.AsStreamForRead();
+                    byte[] buffer = new byte[4096];
+                    var length = await inputStreamClient.ReadAsync(buffer, 0, 4096);
+                    if (length > 0)
+                    {
+                        var source = new byte[length];
+                        Array.Copy(buffer, 0, source, 0, length);
+                        ClientMessageUpdate($"Input: {BitConverter.ToString(source)}");
+                    }
+
+                }
+                catch
+                {
+                    tcpSocketClient?.Dispose();
+                    ClientMessageUpdate(string.Format($"Clent send fail..."));
+                }
+
             }
         }
+
+        public async void ServerSend(Stream outputStream, HsmsMessage hsmsMessage)
+        {
+            if (outputStream != null)
+            {
+                try
+                {
+                    var msg = hsmsMessage.MessageToSend;
+                    await outputStream.WriteAsync(msg, 0, msg.Length);
+                    await outputStream.FlushAsync();
+                    ServerMessageUpdate(string.Format($"Sent : {BitConverter.ToString(msg)}"));
+                }
+                catch
+                {
+                    outputStream?.Dispose();
+                    ServerMessageUpdate(string.Format($"Server send fail..."));
+                }
+
+
+            }
+        }
+
+
+        private void HandleDataMessageServer()
+        {
+
+        }
+
+        private void HandleDataMessageClient()
+        {
+            throw new NotImplementedException();
+        }
+
 
 
         public delegate void ServerMessageHandler(string message);

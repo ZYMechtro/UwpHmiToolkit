@@ -13,6 +13,7 @@ using Windows.UI.Xaml.Data;
 using Windows.UI.Xaml.Input;
 using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Navigation;
+using static UwpHmiToolkit.Semi.HsmsMessage;
 
 
 namespace SampleSemi
@@ -57,9 +58,8 @@ namespace SampleSemi
 
         private void Button_Send_Click(object sender, RoutedEventArgs e)
         {
-            byte[] msg = new byte[] { 0x0d, 0x0a};
-            MySemi.Send(HsmsMessage.DataMessage(0x81, 01, null, null).MessageToSend);
-            
+            MySemi.ClientSend(ControlMessagePrimary(STypes.SelectReq));
+
         }
     }
 }
