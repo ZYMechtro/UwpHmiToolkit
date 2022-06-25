@@ -4,10 +4,18 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace UwpHmiToolkit.DataTool
+namespace UwpHmiToolkit.DataTools
 {
-    internal static class MyTool
+    internal static class DataTool
     {
+        public static void ConcateBytes(ref byte[] first, byte[] second)
+        {
+            byte[] ret = new byte[first.Length + second.Length];
+            Buffer.BlockCopy(first, 0, ret, 0, first.Length);
+            Buffer.BlockCopy(second, 0, ret, first.Length, second.Length);
+            first = ret;
+        }
+
         public static byte[] CombineBytes(byte[] first, byte[] second)
         {
             byte[] ret = new byte[first.Length + second.Length];
@@ -29,6 +37,14 @@ namespace UwpHmiToolkit.DataTool
                 }
             }
             return ret;
+        }
+
+
+        public static byte[] ToBigEndian(byte[] array)
+        {
+            if (BitConverter.IsLittleEndian)
+                Array.Reverse(array);
+            return array;
         }
     }
 }

@@ -11,15 +11,14 @@ using Windows.Networking.Sockets;
 using Windows.Storage.Streams;
 using Windows.UI.Core;
 using System.Net;
-using UwpHmiToolkit.DataTool;
+using UwpHmiToolkit.DataTools;
 using System.Threading;
 using static UwpHmiToolkit.Semi.HsmsMessage;
 
 namespace UwpHmiToolkit.Semi
 {
-    public class Semi : AutoBindableBase
+    public partial class Gem : AutoBindableBase
     {
-
         private HsmsSetting HsmsSetting { get; set; }
 
         protected StreamSocket tcpSocketClient, tcpSocketServer;
@@ -36,7 +35,7 @@ namespace UwpHmiToolkit.Semi
 
         private CoreDispatcher Dispatcher;
 
-        public Semi(HsmsSetting hsmsSetting)
+        public Gem(HsmsSetting hsmsSetting)
         {
             this.HsmsSetting = hsmsSetting;
         }
@@ -138,7 +137,7 @@ namespace UwpHmiToolkit.Semi
                                             break;
 
                                         case STypes.DataMessage:
-                                            HandleDataMessageServer();
+                                            await HandleDataMessage(request);
                                             break;
 
                                         default: break;
@@ -269,11 +268,17 @@ namespace UwpHmiToolkit.Semi
                     outputStream?.Dispose();
                     ServerMessageUpdate(string.Format($"Server send fail..."));
                 }
-
-
             }
         }
 
+        private async Task<HsmsMessage> HandleDataMessage(HsmsMessage request)
+        {
+
+
+
+
+            return null;
+        }
 
         private void HandleDataMessageServer()
         {

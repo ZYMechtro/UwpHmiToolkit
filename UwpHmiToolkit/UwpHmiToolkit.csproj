@@ -136,9 +136,11 @@
     <Compile Include="Protocol\McProtocol.cs" />
     <Compile Include="Protocol\EthernetProtocolBase.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Semi\Gem2.cs" />
     <Compile Include="Semi\Hsms.cs" />
-    <Compile Include="Semi\SecsII.cs" />
-    <Compile Include="Semi\Semi.cs" />
+    <Compile Include="Semi\SecsIiData.cs" />
+    <Compile Include="Semi\Gem.cs" />
+    <Compile Include="Semi\SecsIiFunction.cs" />
     <Compile Include="UiConverter\UiConverter.cs" />
     <Compile Include="ViewModel\ViewModel.cs" />
   </ItemGroup>

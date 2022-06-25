@@ -4,7 +4,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using UwpHmiToolkit.ViewModel;
-using UwpHmiToolkit.DataTool;
+using UwpHmiToolkit.DataTools;
+using static UwpHmiToolkit.DataTools.DataTool;
 
 namespace UwpHmiToolkit.Semi
 {
@@ -97,22 +98,21 @@ namespace UwpHmiToolkit.Semi
                 byte[] bsLength = BitConverter.GetBytes(MessageLength);
                 byte[] bsId = BitConverter.GetBytes(DeviceId);
                 byte[] bsSb = BitConverter.GetBytes(SystemBytes);
-                if (BitConverter.IsLittleEndian)
-                {
-                    Array.Reverse(bsLength);
-                    Array.Reverse(bsId);
-                    Array.Reverse(bsSb);
-                }
-                return MyTool.CombineBytes(
+
+                ToBigEndian(bsLength);
+                ToBigEndian(bsId);
+                ToBigEndian(bsSb);
+
+                return CombineBytes(
                     bsLength,
                     bsId,
-                    new byte[1] { Stream },
+                    new byte[1] { WBit ? (byte)(Stream | 0b10000000) : Stream },
                     new byte[1] { Function },
                     new byte[1] { PType },
                     new byte[1] { (byte)SType },
                     bsSb,
                     MessageText
-                     );
+                    );
             }
         }
 
