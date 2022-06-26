@@ -40,7 +40,7 @@ namespace UwpHmiToolkit.DataTools
         }
 
 
-        public static byte[] ToBigEndian(byte[] array)
+        public static byte[] ReverseIfLittleEndian(byte[] array)
         {
             if (BitConverter.IsLittleEndian)
                 Array.Reverse(array);

@@ -99,9 +99,9 @@ namespace UwpHmiToolkit.Semi
                 byte[] bsId = BitConverter.GetBytes(DeviceId);
                 byte[] bsSb = BitConverter.GetBytes(SystemBytes);
 
-                ToBigEndian(bsLength);
-                ToBigEndian(bsId);
-                ToBigEndian(bsSb);
+                ReverseIfLittleEndian(bsLength);
+                ReverseIfLittleEndian(bsId);
+                ReverseIfLittleEndian(bsSb);
 
                 return CombineBytes(
                     bsLength,

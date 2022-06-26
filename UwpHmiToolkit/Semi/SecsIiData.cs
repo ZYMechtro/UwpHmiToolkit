@@ -28,6 +28,266 @@ namespace UwpHmiToolkit.Semi
             U4 = 0b1011_00,
         }
 
+
+        public static SecsDataBase DecodeSecsII(byte[] bytes, ref int index)
+        {
+            var b = bytes[index];
+            //Get length
+            var lbl = b & 0b_11;
+            var ls = new byte[4];
+            for (int j = 0; j < lbl; j++)
+                ls[j] = bytes[index + lbl - j];
+            var length = BitConverter.ToInt32(ls, 0);
+            index += 1 + lbl;
+            try
+            {
+                switch (b >> 2)
+                {
+                    default:
+                        return null;
+                    case (byte)DataItemType.List:
+                        {
+                            L list = new L();
+                            var handledItemCount = 0;
+                            while (handledItemCount < length)
+                            {
+                                list.Items.Add(DecodeSecsII(bytes, ref index));
+                                handledItemCount++;
+                            }
+                            return list;
+                        }
+                    case (byte)DataItemType.Binary:
+                        {
+                            B binarys = new B();
+                            for (int i = 0; i < length; i++)
+                            {
+                                binarys.Items.Add(bytes[index]);
+                                index += 1;
+                            }
+                            return binarys;
+                        }
+                    case (byte)DataItemType.Boolean:
+                        {
+                            TF bools = new TF();
+                            for (int i = 0; i < length; i++)
+                            {
+                                bools.Items.Add(bytes[index]);
+                                index += 1;
+                            }
+                            return bools;
+                        }
+                    case (byte)DataItemType.ASCII:
+                        {
+                            var bs = Encoding.ASCII.GetString(bytes, index, length);
+                            A asc = new A(bs);
+                            index += length;
+                            return asc;
+                        }
+                    case (byte)DataItemType.JIS8:
+                        {
+                            //TODO: Understand jis8
+                            var bs = Encoding.ASCII.GetString(bytes, index, length);
+                            J asc = new J(bs);
+                            index += length;
+                            return asc;
+                        }
+                    case (byte)DataItemType.I1:
+                        {
+                            I1 i1 = new I1();
+                            for (int i = 0; i < length; i++)
+                            {
+                                i1.Items.Add((sbyte)bytes[index]);
+                                index += 1;
+                            }
+                            return i1;
+                        }
+                    case (byte)DataItemType.I2:
+                        {
+                            const int size = 2;
+                            I2 i2 = new I2();
+                            for (int i = 0; i < length; i += size)
+                            {
+                                var bs = new byte[size]
+                                {
+                                bytes[index],
+                                bytes[index + 1]
+                                };
+                                ReverseIfLittleEndian(bs);
+                                var value = BitConverter.ToInt16(bs, 0);
+                                i2.Items.Add(value);
+                                index += size;
+                            }
+                            return i2;
+                        }
+                    case (byte)DataItemType.I4:
+                        {
+                            const int size = 4;
+                            I4 i4 = new I4();
+                            for (int i = 0; i < length; i += size)
+                            {
+                                var bs = new byte[size]
+                                {
+                                bytes[index],
+                                bytes[index + 1],
+                                bytes[index + 2],
+                                bytes[index + 3],
+                                };
+                                ReverseIfLittleEndian(bs);
+                                var value = BitConverter.ToInt32(bs, 0);
+                                i4.Items.Add(value);
+                                index += size;
+                            }
+                            return i4;
+                        }
+                    case (byte)DataItemType.I8:
+                        {
+                            const int size = 8;
+                            I8 i8 = new I8();
+                            for (int i = 0; i < length; i += size)
+                            {
+                                var bs = new byte[size]
+                                {
+                                bytes[index],
+                                bytes[index + 1],
+                                bytes[index + 2],
+                                bytes[index + 3],
+                                bytes[index + 4],
+                                bytes[index + 5],
+                                bytes[index + 6],
+                                bytes[index + 7],
+                                };
+                                ReverseIfLittleEndian(bs);
+                                var value = BitConverter.ToInt64(bs, 0);
+                                i8.Items.Add(value);
+                                index += size;
+                            }
+                            return i8;
+                        }
+                    case (byte)DataItemType.U1:
+                        {
+                            U1 u1 = new U1();
+                            for (int i = 0; i < length; i++)
+                            {
+                                u1.Items.Add(bytes[index]);
+                                index += 1;
+                            }
+                            return u1;
+                        }
+                    case (byte)DataItemType.U2:
+                        {
+                            const int size = 2;
+                            U2 u2 = new U2();
+                            for (int i = 0; i < length; i += size)
+                            {
+                                var bs = new byte[size]
+                                {
+                                bytes[index],
+                                bytes[index + 1]
+                                };
+                                ReverseIfLittleEndian(bs);
+                                var value = BitConverter.ToUInt16(bs, 0);
+                                u2.Items.Add(value);
+                                index += size;
+                            }
+                            return u2;
+                        }
+                    case (byte)DataItemType.U4:
+                        {
+                            const int size = 4;
+                            U4 u4 = new U4();
+                            for (int i = 0; i < length; i += size)
+                            {
+                                var bs = new byte[size]
+                                {
+                                bytes[index],
+                                bytes[index + 1],
+                                bytes[index + 2],
+                                bytes[index + 3],
+                                };
+                                ReverseIfLittleEndian(bs);
+                                var value = BitConverter.ToUInt32(bs, 0);
+                                u4.Items.Add(value);
+                                index += size;
+                            }
+                            return u4;
+                        }
+                    case (byte)DataItemType.U8:
+                        {
+                            const int size = 8;
+                            U8 u8 = new U8();
+                            for (int i = 0; i < length; i += size)
+                            {
+                                var bs = new byte[size]
+                                {
+                                bytes[index],
+                                bytes[index + 1],
+                                bytes[index + 2],
+                                bytes[index + 3],
+                                bytes[index + 4],
+                                bytes[index + 5],
+                                bytes[index + 6],
+                                bytes[index + 7],
+                                };
+                                ReverseIfLittleEndian(bs);
+                                var value = BitConverter.ToUInt64(bs, 0);
+                                u8.Items.Add(value);
+                                index += size;
+                            }
+                            return u8;
+                        }
+                    case (byte)DataItemType.F4:
+                        {
+                            const int size = 4;
+                            F4 f4 = new F4();
+                            for (int i = 0; i < length; i += size)
+                            {
+                                var bs = new byte[size]
+                                {
+                                bytes[index],
+                                bytes[index + 1],
+                                bytes[index + 2],
+                                bytes[index + 3],
+                                };
+                                ReverseIfLittleEndian(bs);
+                                var value = BitConverter.ToSingle(bs, 0);
+                                f4.Items.Add(value);
+                                index += size;
+                            }
+                            return f4;
+                        }
+                    case (byte)DataItemType.F8:
+                        {
+                            const int size = 8;
+                            F8 f8 = new F8();
+                            for (int i = 0; i < length; i += size)
+                            {
+                                var bs = new byte[size]
+                                {
+                                bytes[index],
+                                bytes[index + 1],
+                                bytes[index + 2],
+                                bytes[index + 3],
+                                bytes[index + 4],
+                                bytes[index + 5],
+                                bytes[index + 6],
+                                bytes[index + 7],
+                                };
+                                ReverseIfLittleEndian(bs);
+                                var value = BitConverter.ToDouble(bs, 0);
+                                f8.Items.Add(value);
+                                index += size;
+                            }
+                            return f8;
+                        }
+
+                }
+            }
+            catch (ArgumentOutOfRangeException ex)
+            {
+                return null;
+            }
+        }
+
         public abstract class SecsDataBase
         {
             public abstract DataItemType Type { get; }
@@ -43,7 +303,7 @@ namespace UwpHmiToolkit.Semi
                     var bs = BitConverter.GetBytes(Length);
                     var result = new byte[lengthOfLengthBytes];
                     Array.Copy(bs, result, lengthOfLengthBytes);
-                    ToBigEndian(result);
+                    ReverseIfLittleEndian(result);
                     return result;
                 }
             }
@@ -62,12 +322,6 @@ namespace UwpHmiToolkit.Semi
                     lbs.AddRange(ValueInBytes);
                     return lbs;
                 }
-            }
-
-            public SecsDataBase Decode(byte[] bytes)
-            {
-                //TODO: Decode
-                return null;
             }
 
         }
@@ -230,7 +484,7 @@ namespace UwpHmiToolkit.Semi
                     foreach (var item in Items)
                     {
                         var bs = BitConverter.GetBytes(item);
-                        ToBigEndian(bs);
+                        ReverseIfLittleEndian(bs);
                         rs.AddRange(bs);
                     }
                     return rs;
@@ -262,7 +516,7 @@ namespace UwpHmiToolkit.Semi
                     foreach (var item in Items)
                     {
                         var bs = BitConverter.GetBytes(item);
-                        ToBigEndian(bs);
+                        ReverseIfLittleEndian(bs);
                         rs.AddRange(bs);
                     }
                     return rs;
@@ -294,7 +548,7 @@ namespace UwpHmiToolkit.Semi
                     foreach (var item in Items)
                     {
                         var bs = BitConverter.GetBytes(item);
-                        ToBigEndian(bs);
+                        ReverseIfLittleEndian(bs);
                         rs.AddRange(bs);
                     }
                     return rs;
@@ -350,7 +604,7 @@ namespace UwpHmiToolkit.Semi
                     foreach (var item in Items)
                     {
                         var bs = BitConverter.GetBytes(item);
-                        ToBigEndian(bs);
+                        ReverseIfLittleEndian(bs);
                         rs.AddRange(bs);
                     }
                     return rs;
@@ -381,7 +635,7 @@ namespace UwpHmiToolkit.Semi
                     foreach (var item in Items)
                     {
                         var bs = BitConverter.GetBytes(item);
-                        ToBigEndian(bs);
+                        ReverseIfLittleEndian(bs);
                         rs.AddRange(bs);
                     }
                     return rs;
@@ -413,7 +667,7 @@ namespace UwpHmiToolkit.Semi
                     foreach (var item in Items)
                     {
                         var bs = BitConverter.GetBytes(item);
-                        ToBigEndian(bs);
+                        ReverseIfLittleEndian(bs);
                         rs.AddRange(bs);
                     }
                     return rs;
@@ -444,7 +698,7 @@ namespace UwpHmiToolkit.Semi
                     foreach (var item in Items)
                     {
                         var bs = BitConverter.GetBytes(item);
-                        ToBigEndian(bs);
+                        ReverseIfLittleEndian(bs);
                         rs.AddRange(bs);
                     }
                     return rs;
@@ -475,7 +729,7 @@ namespace UwpHmiToolkit.Semi
                     foreach (var item in Items)
                     {
                         var bs = BitConverter.GetBytes(item);
-                        ToBigEndian(bs);
+                        ReverseIfLittleEndian(bs);
                         rs.AddRange(bs);
                     }
                     return rs;
