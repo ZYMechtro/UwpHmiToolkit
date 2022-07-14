@@ -6,6 +6,8 @@ using System.Threading.Tasks;
 using UwpHmiToolkit.ViewModel;
 using UwpHmiToolkit.DataTools;
 using static UwpHmiToolkit.DataTools.DataTool;
+using static UwpHmiToolkit.Semi.SecsII;
+
 
 namespace UwpHmiToolkit.Semi
 {
@@ -32,7 +34,7 @@ namespace UwpHmiToolkit.Semi
         /// <summary>
         /// HSMS-SS State Machine
         /// </summary>
-        public enum State { NotConnected, NotSelected, Selected }
+        public enum HsmsState { NotConnected, NotSelected, Selected }
 
         /// <summary>
         /// SystemByte for sending, Will generate a random value while create.
@@ -128,6 +130,9 @@ namespace UwpHmiToolkit.Semi
         public static HsmsMessage DataMessageSecondary(HsmsMessage request, byte[] text = null)
             => new HsmsMessage(request.DeviceId, request.Stream, (byte)(request.Function + 1), STypes.DataMessage, request.SystemBytes, text);
 
+        public static HsmsMessage DataMessageAbort(HsmsMessage request, byte[] text = null)
+                    => new HsmsMessage(request.DeviceId, request.Stream, 0, STypes.DataMessage, request.SystemBytes, text);
+
         public static HsmsMessage ControlMessagePrimary(STypes sType)
             => new HsmsMessage(controlMessageId, 0, 0, sType, CurrentSystemBytes);
 
@@ -137,15 +142,16 @@ namespace UwpHmiToolkit.Semi
         public static HsmsMessage RejectControlMessage(HsmsMessage request, byte reasonCode)
            => new HsmsMessage(request.DeviceId, (byte)request.SType, reasonCode, STypes.RejectReq, request.SystemBytes);
 
-        public static bool TryParseHsms(byte[] sourceMessage, out HsmsMessage hsmsMessage)
+        public static bool TryParseHsms(byte[] sourceMessage, out HsmsMessage hsmsMessage, ref int waitBytesQty)
         {
             if (sourceMessage != null
                 && sourceMessage.Length >= 14)
             {
                 byte[] lengthByte = new byte[4] { sourceMessage[3], sourceMessage[2], sourceMessage[1], sourceMessage[0] };
-                var lengthOfMessage = BitConverter.ToUInt32(lengthByte, 0);
-                if (lengthOfMessage == sourceMessage.Length - 4)
+                var lengthOfMessage = BitConverter.ToInt32(lengthByte, 0);
+                if (lengthOfMessage >= sourceMessage.Length - 4)
                 {
+                    waitBytesQty = lengthOfMessage - (sourceMessage.Length - 4);
                     var id = BitConverter.ToUInt16(new byte[2] { sourceMessage[5], sourceMessage[4] }, 0);
                     uint sb = BitConverter.ToUInt32(new byte[4] { sourceMessage[13], sourceMessage[12], sourceMessage[11], sourceMessage[10] }, 0);
                     if (sourceMessage.Length > 14)
@@ -175,12 +181,26 @@ namespace UwpHmiToolkit.Semi
             MessageText = messageText;
         }
 
+        public string ToSML()
+        {
+            if (SType == STypes.DataMessage)
+            {
+                var r = $"\nS{Stream}F{Function}";
+                if (WBit)
+                    r += "R";
+                r += "\n";
+                int i = 0;
+                var item = DecodeSecsII(MessageText, ref i);
+                r += item.ToSML(0);
+                return r;
+            }
+            return SType.ToString();
+        }
     }
 
     public class HsmsSetting : AutoBindableBase
     {
         public enum ConnectionMode { Passive, Active };
-
 
         public ConnectionMode Mode { get; set; } = ConnectionMode.Passive;
 

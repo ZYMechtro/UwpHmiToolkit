@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices.WindowsRuntime;
@@ -28,6 +29,8 @@ namespace SampleSemi
             MySemi = new Gem(hsmsSetting);
             MySemi.ServerMessageUpdate += MySemi_ServerMessageUpdate;
             MySemi.ClientMessageUpdate += MySemi_ClientMessageUpdate;
+
+            MySemi.Start();
         }
 
         private async void MySemi_ClientMessageUpdate(string message)
@@ -58,23 +61,27 @@ namespace SampleSemi
 
         private void Button_Send_Click(object sender, RoutedEventArgs e)
         {
-            var l = new L();
-            l.Items.Add(new A("Hello World!"));
-            l.Items.Add(new I1(12, 34, 56, 78));
-            l.Items.Add(new U4(1234, 4321));
-            var s = DataMessagePrimary(1, 1, l.Encode.ToArray(), null);
-            ClientListBox.Items.Insert(0, BitConverter.ToString(s.MessageToSend));
-            ClientListBox.Items.Insert(0, "Decodeing...");
 
-            if (TryParseHsms(s.MessageToSend, out var hsmsMessage))
-            {
-                int i = 0;
-                var dataItem = DecodeSecsII(hsmsMessage.MessageText, ref i);
-                ClientListBox.Items.Insert(0, i);
-            }
+            //var l = new L();
+            //l.Items.Add(new A("Hello World!"));
+            //l.Items.Add(new I1(12, 34, 56, 78));
+            //l.Items.Add(new U4(1234, 4321));
+            //l.Items.Add(new U8());
+            //var s = DataMessagePrimary(1, 1, l.Encode.ToArray(), null);
+            //ClientListBox.Items.Insert(0, BitConverter.ToString(s.MessageToSend));
+            //ClientListBox.Items.Insert(0, "Decodeing...");
+            //MySemi.ServerSend(s);
+            //if (TryParseHsms(s.MessageToSend, out var hsmsMessage))
+            //{
+            //    int i = 0;
+            //    var dataItem = DecodeSecsII(hsmsMessage.MessageText, ref i);
+            //    ClientListBox.Items.Insert(0, i);
+            //    ClientListBox.Items.Insert(0, dataItem.ToSML(0));
+            //}
 
             //MySemi.ClientSend(ControlMessagePrimary(STypes.SelectReq));
 
         }
+
     }
 }

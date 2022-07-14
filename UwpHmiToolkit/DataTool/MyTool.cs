@@ -39,12 +39,19 @@ namespace UwpHmiToolkit.DataTools
             return ret;
         }
 
-
         public static byte[] ReverseIfLittleEndian(byte[] array)
         {
             if (BitConverter.IsLittleEndian)
                 Array.Reverse(array);
             return array;
+        }
+
+        public static string RepeatString(string str, int times)
+        {
+            var result = "";
+            for (int i = 0; i < times; i++)
+                result += str;
+            return result;
         }
     }
 }

@@ -136,7 +136,9 @@
     <Compile Include="Protocol\McProtocol.cs" />
     <Compile Include="Protocol\EthernetProtocolBase.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Semi\Gem2.cs" />
+    <Compile Include="Semi\EquipmentInfo.cs" />
+    <Compile Include="Semi\GemHandle.cs" />
+    <Compile Include="Semi\GemStatus.cs" />
     <Compile Include="Semi\Hsms.cs" />
     <Compile Include="Semi\SecsIiData.cs" />
     <Compile Include="Semi\Gem.cs" />

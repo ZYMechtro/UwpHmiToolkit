@@ -63,7 +63,13 @@ namespace UwpHmiToolkit.Protocol
 
             try
             {
-                var pair = new EndpointPair(new HostName(GetLocalIp(HostName.CanonicalName)), Port, HostName, Port);
+                var localIp = GetLocalIp(HostName.CanonicalName);
+                if (localIp is null)
+                {
+                    CommunicationError("No cable connections.");
+                    return false;
+                }
+                var pair = new EndpointPair(new HostName(localIp), Port, HostName, Port);
 
                 await udpSocket.ConnectAsync(pair);
                 outputStream = (await udpSocket.GetOutputStreamAsync(HostName, Port)).AsStreamForWrite();
@@ -138,7 +144,7 @@ namespace UwpHmiToolkit.Protocol
 
         public ushort Timeout { get; }
 
-        public int SendDelay { get; }
+        public int SendDelay { get; set; }
 
         public bool IsReadonly { get; set; }
 
@@ -150,7 +156,7 @@ namespace UwpHmiToolkit.Protocol
         {
             isOnline = b;
             OnPropertyChanged("IsOnline");
-            devicesToWrite.Clear();
+            //devicesToWrite.Clear();
             RaiseOnlineStateChange();
         }
 
@@ -184,8 +190,18 @@ namespace UwpHmiToolkit.Protocol
         {
             dispatcherTimer.Stop();
 
+            if (!IsOnline)
+            {
+                await this.TryDisconnectAsync();
+                await TryConnectAsync();
+            }
+
             if (IsOnline)
                 await CommunicateAsync();
+            else
+            {
+                dispatcherTimer.Interval = new TimeSpan(0, 0, 3);
+            }
 
             dispatcherTimer.Start();
         }
@@ -264,6 +280,7 @@ namespace UwpHmiToolkit.Protocol
             this.RefreshInterval = setting.RefreshInterval;
             this.Timeout = setting.Timeout;
             this.CurrentDispatcher = dispatcher;
+            this.SendDelay = setting.SendDelay;
         }
 
         #region DeviceModel
@@ -375,6 +392,7 @@ namespace UwpHmiToolkit.Protocol
         public ushort Timeout { get; set; }
 
         public ushort SendDelay { get; set; }
+
     }
 
 

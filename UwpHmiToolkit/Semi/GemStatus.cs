@@ -10,46 +10,39 @@ namespace UwpHmiToolkit.Semi
     {
         public enum CommunicationState
         {
-            Disable = 0,
-            Enable = 1,
-            NotCommunicatig = 2,
-            WaitDelay = 3,
-            WaitCra = 4,
-            WaitCcrFromHost = 5,
-            Communicating = 6
+            Disable,
+            Enable_WaitDelay,
+            Enable_WaitCra,
+            Enable_WaitCrFromHost,
+            Enable_Communicating
         }
 
         public enum ControlState
         {
-            Offline = 0,
-            EqpOffline = 1,
-            AttemptOnline = 2,
-            HostOffline = 3,
-            Online = 4,
-            Local = 5,
-            Remote = 6
+            Offline_EqpOffline,
+            Offline_AttemptOnline,
+            Offline_HostOffline,
+            Online_Local,
+            Online_Remote
         }
 
         public enum ProcessingState
         {
             Initialize,
             Idle,
-            Setup,
             Ready,
             Running,
             PauseOnReady
         }
 
-
         public enum SpoolingState
         {
             SpoolInactive,
-            SpoolActive,
-            PurgeSpool,
-            TransmitSpool,
-            NoSpoolOutput,
-            SpoolNotFull,
-            SpoolFull
+            Active_Output_PurgeSpool,
+            Active_Output_TransmitSpool,
+            Active_NoSpoolOutput,
+            Active_SpoolNotFull,
+            Active_SpoolFull
         }
 
     }
