@@ -57,7 +57,7 @@ namespace UwpHmiToolkit.Semi
                                         var info = new L();
                                         info.Items.Add(new A(EquipmentInfo.MDLN));
                                         info.Items.Add(new A(EquipmentInfo.SOFTREV));
-                                        SendServer(DataMessageSecondary(request, EncodeSecsII(info)));
+                                        SendServer(DataMessageSecondary(request, info));
                                     }
                                 }
                                 break;
@@ -65,7 +65,7 @@ namespace UwpHmiToolkit.Semi
                             case 2: //On Line Data
                                 {
                                     if (CurrentControlState == ControlState.Offline_AttemptOnline)
-                                        CurrentControlState = ControlState.Online_Local;
+                                        SwitchControlState(ControlState.Online_Local);
                                 }
                                 break;
 
@@ -87,9 +87,10 @@ namespace UwpHmiToolkit.Semi
                                 {
                                     if (CurrentCommunicationState == CommunicationState.Enable_WaitCrFromHost
                                         || CurrentCommunicationState == CommunicationState.Enable_WaitCra
-                                        || CurrentCommunicationState == CommunicationState.Enable_WaitDelay)
+                                        || CurrentCommunicationState == CommunicationState.Enable_WaitDelay
+                                        || CurrentCommunicationState == CommunicationState.Enable_Communicating)
                                     {
-                                        CurrentCommunicationState = CommunicationState.Enable_Communicating;
+                                        SwitchCommState(CommunicationState.Enable_Communicating);
                                         if (request.WBit)
                                         {
                                             var L = new L();
@@ -98,7 +99,7 @@ namespace UwpHmiToolkit.Semi
                                             info.Items.Add(new A(EquipmentInfo.SOFTREV));
                                             L.Items.Add(new B(0));
                                             L.Items.Add(info);
-                                            SendServer(DataMessageSecondary(request, EncodeSecsII(L)));
+                                            SendServer(DataMessageSecondary(request, L));
                                         }
                                     }
                                 }
@@ -106,13 +107,12 @@ namespace UwpHmiToolkit.Semi
 
                             case 14: //Establish Communications Request Acknowledge
                                 {
-                                    int i = 0;
                                     if (CurrentCommunicationState == CommunicationState.Enable_WaitCra
                                         && (lastSentMessageServer.Stream, lastSentMessageServer.Function) == (1, 13))
                                     {
                                         var item = DecodeSecsII(request.MessageText);
                                         if (item is L list && list.Items.Count == 2 && list.Items[0] is B b && b.Items[0] == 0)
-                                            CurrentCommunicationState = CommunicationState.Enable_Communicating;
+                                            SwitchCommState(CommunicationState.Enable_Communicating);
                                     }
                                 }
                                 break;
@@ -120,16 +120,29 @@ namespace UwpHmiToolkit.Semi
 
                             case 15: //Request OFF-LINE
                                 {
-                                    CurrentControlState = ControlState.Offline_HostOffline;
+                                    SwitchControlState(ControlState.Offline_HostOffline);
                                     if (request.WBit)
-                                        SendServer(DataMessageSecondary(request, EncodeSecsII(new B(0))));
+                                        SendServer(DataMessageSecondary(request, new B(0)));
                                 }
                                 break;
 
                             case 17: //Request ON-LINE
                                 {
-                                    if (CurrentControlState == ControlState.Offline_HostOffline)
-                                        CurrentControlState = ControlState.Online_Local;
+                                    if (CurrentControlState == ControlState.Offline_HostOffline
+                                        || CurrentControlState == ControlState.Offline_AttemptOnline)
+                                    {
+                                        SwitchControlState(ControlState.Online_Local);
+                                        if (request.WBit)
+                                            SendServer(DataMessageSecondary(request, new B(0)));
+                                    }
+                                    else if (CurrentControlState == ControlState.Online_Local
+                                        || CurrentControlState == ControlState.Online_Remote)
+                                    {
+                                        if (request.WBit)
+                                            SendServer(DataMessageSecondary(request, new B(2)));
+                                    }
+
+
                                 }
                                 break;
 
@@ -142,21 +155,95 @@ namespace UwpHmiToolkit.Semi
                         {
                             switch (request.Function)
                             {
-                                case 25:
+                                case 25: //Loopback Diagnostic Request
                                     {
-
+                                        if (request.WBit
+                                            && DecodeSecsII(request.MessageText) is B bs)
+                                            SendServer(DataMessageSecondary(request, request.MessageText));
                                     }
                                     break;
 
-                                case 37:
+                                case 37: //Enable/Disable Event Report
                                     {
-
+                                        if (request.WBit)
+                                            GotMessageNeedsReply(request);
                                     }
                                     break;
 
-                                case 41:
+                                case 41: //Host Command Send
                                     {
+                                        byte HCACK = 0;
+                                        if (DecodeSecsII(request.MessageText) is L list
+                                            && !list.IsEmpty
+                                            && list.Items[0] is A a
+                                            && !a.IsEmpty
+                                            && a.GetString.ToUpper() is string cmd)
+                                        {
+                                            if (CurrentControlState != ControlState.Online_Remote && cmd != "REMOTE" && cmd != "LOCAL")
+                                                break;
 
+                                            switch (cmd)
+                                            {
+                                                case "START":
+                                                    if (CurrentProcessingState == ProcessingState.Idle)
+                                                        SwitchProcessingState(ProcessingState.Ready);
+                                                    else if (CurrentProcessingState == ProcessingState.Ready)
+                                                        HCACK = 5;
+                                                    else
+                                                        HCACK = 2;
+                                                    break;
+                                                case "STOP":
+                                                    if (CurrentProcessingState == ProcessingState.Ready
+                                                        || CurrentProcessingState == ProcessingState.PauseOnReady)
+                                                        SwitchProcessingState(ProcessingState.Idle);
+                                                    else if (CurrentProcessingState == ProcessingState.Idle)
+                                                        HCACK = 5;
+                                                    else
+                                                        HCACK = 2;
+                                                    break;
+                                                case "PAUSE":
+                                                    if (CurrentProcessingState == ProcessingState.Ready)
+                                                        SwitchProcessingState(ProcessingState.PauseOnReady);
+                                                    else if (CurrentProcessingState == ProcessingState.PauseOnReady)
+                                                        HCACK = 5;
+                                                    else
+                                                        HCACK = 2;
+                                                    break;
+                                                case "RESUME":
+                                                    if (CurrentProcessingState == ProcessingState.PauseOnReady)
+                                                        SwitchProcessingState(ProcessingState.Ready);
+                                                    else if (CurrentProcessingState == ProcessingState.Ready)
+                                                        HCACK = 5;
+                                                    else
+                                                        HCACK = 2;
+                                                    break;
+                                                case "REMOTE":
+                                                    if (CurrentControlState == ControlState.Online_Local)
+                                                        SwitchControlState(ControlState.Online_Remote);
+                                                    else if (CurrentControlState == ControlState.Online_Remote)
+                                                        HCACK = 5;
+                                                    else
+                                                        HCACK = 2;
+                                                    break;
+                                                case "LOCAL":
+                                                    if (CurrentControlState == ControlState.Online_Remote)
+                                                        SwitchControlState(ControlState.Online_Local);
+                                                    else if (CurrentControlState == ControlState.Online_Local)
+                                                        HCACK = 5;
+                                                    else
+                                                        HCACK = 2;
+                                                    break;
+                                                default:
+
+                                                    break;
+                                            }
+                                        }
+                                        else
+                                        {
+                                            HCACK = 1;
+                                        }
+
+                                        SendServer(DataMessageSecondary(request, RcmdReply(HCACK)));
                                     }
                                     break;
 
@@ -333,16 +420,23 @@ namespace UwpHmiToolkit.Semi
         {
             if (CurrentCommunicationState != CommunicationState.Enable_Communicating)
             {
-                CurrentCommunicationState = CommunicationState.Enable_WaitCra;
+                SwitchCommState(CommunicationState.Enable_WaitCra);
                 var info = new L();
                 info.Items.Add(new A(EquipmentInfo.MDLN));
                 info.Items.Add(new A(EquipmentInfo.SOFTREV));
-                SendServer(DataMessagePrimary(1, 13, EncodeSecsII(info)));
+                SendServer(DataMessagePrimary(1, 13, info));
             }
 
         }
 
-
+        public byte[] RcmdReply(byte hcack)
+        {
+            var l = new L();
+            var l2 = new L();
+            l.Items.Add(new B(hcack));
+            l.Items.Add(l2);
+            return EncodeSecsII(l);
+        }
 
 
     }

@@ -127,8 +127,15 @@ namespace UwpHmiToolkit.Semi
         public static HsmsMessage DataMessagePrimary(byte s, byte f, byte[] text = null, byte? sourceSystemBytes = null)
             => new HsmsMessage(deviceId, (byte)(s | 0b10000000), f, STypes.DataMessage, null, text);
 
+        public static HsmsMessage DataMessagePrimary(byte s, byte f, SecsDataBase secsData = null, byte? sourceSystemBytes = null)
+           => new HsmsMessage(deviceId, (byte)(s | 0b10000000), f, STypes.DataMessage, null, EncodeSecsII(secsData));
+
         public static HsmsMessage DataMessageSecondary(HsmsMessage request, byte[] text = null)
             => new HsmsMessage(request.DeviceId, request.Stream, (byte)(request.Function + 1), STypes.DataMessage, request.SystemBytes, text);
+
+        public static HsmsMessage DataMessageSecondary(HsmsMessage request, SecsDataBase secsData = null)
+    => new HsmsMessage(request.DeviceId, request.Stream, (byte)(request.Function + 1), STypes.DataMessage, request.SystemBytes, EncodeSecsII(secsData));
+
 
         public static HsmsMessage DataMessageAbort(HsmsMessage request, byte[] text = null)
                     => new HsmsMessage(request.DeviceId, request.Stream, 0, STypes.DataMessage, request.SystemBytes, text);
@@ -189,9 +196,7 @@ namespace UwpHmiToolkit.Semi
                 if (WBit)
                     r += "R";
                 r += "\n";
-                int i = 0;
-                var item = DecodeSecsII(MessageText, ref i);
-                r += item.ToSML(0);
+                r += MessageText == null ? "" : DecodeSecsII(MessageText).ToSML(0);
                 return r;
             }
             return SType.ToString();

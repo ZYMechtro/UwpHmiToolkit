@@ -556,6 +556,8 @@ namespace UwpHmiToolkit.Semi
 
             public virtual int Length => ValueInBytes.Count;
 
+            public bool IsEmpty => ValueInBytes.Count == 0;
+
             private byte lengthOfLengthBytes => (byte)(Length > 0xff ? (Length > 0xffff ? 3 : 2) : 1);
 
             public byte[] LengthInBytes
@@ -599,6 +601,8 @@ namespace UwpHmiToolkit.Semi
                 var sml = "";
                 sml += RepeatString(space, indentLevel) + "<";
                 sml += str;
+                if (sml.Last() == '\n')
+                    sml += RepeatString(space, indentLevel);
                 sml += ">";
                 if (indentLevel == 0)
                     sml += ".";
@@ -650,8 +654,7 @@ namespace UwpHmiToolkit.Semi
                 sml += "\n";
                 foreach (var item in Items)
                 {
-                    sml += RepeatString(space, indentLevel + 1);
-                    sml += item.ToSML(indentLevel + 1);
+                    sml += item.ToSML(indentLevel+2);
                     sml += "\n";
                 }
                 var result = AddBracket(sml, indentLevel);
@@ -668,6 +671,8 @@ namespace UwpHmiToolkit.Semi
 
             public override List<byte> ValueInBytes
                 => Encoding.ASCII.GetBytes(new string(Items.ToArray())).ToList();
+
+            public string GetString => new string(Items.ToArray());
 
             public A(string str)
             {

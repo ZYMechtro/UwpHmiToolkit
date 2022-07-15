@@ -23,7 +23,7 @@ namespace UwpHmiToolkit.Semi
     {
         private HsmsSetting HsmsSetting { get; set; }
 
-        public EquipmentInfo EquipmentInfo { get; set; }
+        public EquipmentInfo EquipmentInfo { get; set; } = new EquipmentInfo();
 
         protected StreamSocket tcpSocketClient, tcpSocketServer;
         protected Stream inputStreamClient, outputStreamClient;
@@ -40,19 +40,25 @@ namespace UwpHmiToolkit.Semi
         CancellationTokenSource ctsServer, ctsClient;
 
 
+        #region StateModel
         public HsmsState CurrentHsmsState { get; private set; } = HsmsState.NotConnected;
-
         public CommunicationState CurrentCommunicationState { get; private set; } = CommunicationState.Disable;
-        public ControlState CurrentControlState { get; private set; } = ControlState.Offline_EqpOffline;
-        public ProcessingState CurrentProcessingState { get; private set; } = ProcessingState.Initialize;
+        public ControlState CurrentControlState { get; private set; } = ControlState.Offline_HostOffline;
+        public ProcessingState CurrentProcessingState { get; private set; } = ProcessingState.Idle;
         public SpoolingState CurrentSpoolingState { get; private set; } = SpoolingState.SpoolInactive;
 
+        public async void SwitchHsmsState(HsmsState newState) => await UpdateWithUI(() => CurrentHsmsState = newState);
+        public async void SwitchCommState(CommunicationState newState) => await UpdateWithUI(() => CurrentCommunicationState = newState);
+        public async void SwitchControlState(ControlState newState) => await UpdateWithUI(() => CurrentControlState = newState);
+        public async void SwitchProcessingState(ProcessingState newState) => await UpdateWithUI(() => CurrentProcessingState = newState);
+        public async void SwitchSpoolState(SpoolingState newState) => await UpdateWithUI(() => CurrentSpoolingState = newState);
+        #endregion /StateModel
 
-        private CoreDispatcher Dispatcher;
 
-        public Gem(HsmsSetting hsmsSetting)
+        public Gem(HsmsSetting hsmsSetting, CoreDispatcher coreDispatcher)
         {
             this.HsmsSetting = hsmsSetting;
+            this.dispatcher = coreDispatcher;
         }
 
         public async void Start()
@@ -78,8 +84,8 @@ namespace UwpHmiToolkit.Semi
             ctsServer = new CancellationTokenSource();
             try
             {
-                CurrentHsmsState = HsmsState.NotConnected;
-                CurrentCommunicationState = CommunicationState.Enable_WaitCrFromHost;
+                SwitchHsmsState(HsmsState.NotConnected);
+                SwitchCommState(CommunicationState.Enable_WaitCrFromHost);
                 var streamSocketListener = new StreamSocketListener();
                 streamSocketListener.ConnectionReceived += this.StreamSocketListener_ConnectionReceived;
                 await streamSocketListener.BindServiceNameAsync(HsmsSetting.LocalPort);
@@ -107,7 +113,7 @@ namespace UwpHmiToolkit.Semi
                 {
                     if (CurrentHsmsState == HsmsState.NotConnected)
                     {
-                        CurrentHsmsState = HsmsState.NotSelected;
+                        SwitchHsmsState(HsmsState.NotSelected);
                         ServerMessageUpdate($"New Connect coming, State: [NotSelected]");
                     }
 
@@ -115,8 +121,7 @@ namespace UwpHmiToolkit.Semi
                     {
                         var outputStream = args.Socket.OutputStream.AsStreamForWrite();
                         outputStreamServer = outputStream;
-                        SetupTimerServer();
-
+                        await UpdateWithUI(() => { SetupTimerServer(); });
                         bool separate = false;
                         while (!separate)
                         {
@@ -143,7 +148,7 @@ namespace UwpHmiToolkit.Semi
                                                     if (CurrentHsmsState == HsmsState.NotSelected)
                                                     {
                                                         SendServer(ControlMessageSecondary(request, STypes.SelectRsp));
-                                                        CurrentHsmsState = HsmsState.Selected;
+                                                        SwitchHsmsState(HsmsState.Selected);
                                                     }
                                                     else
                                                         SendServer(RejectControlMessage(request, 1));
@@ -166,7 +171,7 @@ namespace UwpHmiToolkit.Semi
                                                     if (CurrentHsmsState == HsmsState.Selected)
                                                     {
                                                         SendServer(ControlMessageSecondary(request, STypes.DeselectRsp));
-                                                        CurrentHsmsState = HsmsState.NotSelected;
+                                                        SwitchHsmsState(HsmsState.NotSelected);
                                                     }
                                                     else
                                                         SendServer(RejectControlMessage(request, 3));
@@ -218,7 +223,7 @@ namespace UwpHmiToolkit.Semi
                                             if (CurrentHsmsState == HsmsState.NotSelected)
                                             {
                                                 ServerMessageUpdate($"NotSelected timeout (T7), State: [NotConnected]");
-                                                CurrentHsmsState = HsmsState.NotConnected;
+                                                SwitchHsmsState(HsmsState.NotConnected);
                                                 separate = true;
                                             }
                                             break;
@@ -237,10 +242,15 @@ namespace UwpHmiToolkit.Semi
                                     await Task.Delay(1000);
                                 }
                             }
-                            catch { }
+                            catch (Exception ex)
+                            {
+                                separate = true;
+                            }
                         }
                     }
-                    CurrentHsmsState = HsmsState.NotConnected;
+                    SwitchHsmsState(HsmsState.NotConnected);
+                    SwitchControlState(ControlState.Offline_HostOffline);
+                    SwitchCommState(CommunicationState.Enable_WaitCrFromHost);
                     ServerMessageUpdate("Server is listening...");
                 }
             }
@@ -261,7 +271,7 @@ namespace UwpHmiToolkit.Semi
                 outputStreamClient = tcpSocketClient.OutputStream.AsStreamForWrite();
                 outputStreamClient.WriteTimeout = HsmsSetting.T8 * 1000;
                 inputStreamClient = tcpSocketClient.InputStream.AsStreamForRead();
-                SetupTimerClient();
+                await UpdateWithUI(() => { SetupTimerClient(); });
                 StartListenClient();
             }
             catch (Exception ex)
@@ -339,7 +349,7 @@ namespace UwpHmiToolkit.Semi
                     }
                     if (hsmsMessage.WBit)
                     {
-                        waitingReplyServer = true;
+                        //waitingReplyServer = true;
                     }
                 }
                 catch
@@ -347,12 +357,6 @@ namespace UwpHmiToolkit.Semi
                     ServerMessageUpdate(string.Format($"Server send fail..."));
                 }
             }
-        }
-
-        public void SwitchCommState(bool enable)
-        {
-            if (!enable && CurrentCommunicationState != CommunicationState.Disable)
-                CurrentCommunicationState = CommunicationState.Disable;
         }
 
         public void AddMessageToSendServer(HsmsMessage hsmsMessage) => messageListToSendServer.Add(hsmsMessage);
@@ -370,41 +374,64 @@ namespace UwpHmiToolkit.Semi
         public delegate HsmsMessage GotMessageNeedsReplyHandler(HsmsMessage request);
         public event GotMessageNeedsReplyHandler GotMessageNeedsReply;
 
+        //public delegate void RcmdHandler(HsmsMessage request,string rcmd);
+        //public event RcmdHandler RcmdRequest;
+
+
 
         DispatcherTimer timerServer, timerClient;
 
-        private void SetupTimerServer()
+        private async void SetupTimerServer()
         {
+
             if (timerServer != null)
                 timerServer.Tick -= TimerServer_Tick;
-            timerServer = new DispatcherTimer() { Interval = new TimeSpan(0, 0, 0, 0, 500) };
-            timerServer.Tick += TimerServer_Tick;
+            await UpdateWithUI(() =>
+            {
+                timerServer = new DispatcherTimer { Interval = new TimeSpan(0, 0, 0, 0, 500) };
+                timerServer.Tick += TimerServer_Tick;
+            });
+            //await UpdateWithUI(() =>
+            //{
+            //    timerServer.Start();
+            //});
         }
 
         private void TimerServer_Tick(object sender, object e)
         {
+            timerServer.Stop();
             foreach (var msg in messageListToSendServer)
             {
                 SendServer(msg);
                 Task.Delay(100);
             }
+            timerServer.Start();
         }
 
-        private void SetupTimerClient()
+        private async void SetupTimerClient()
         {
             if (timerClient != null)
                 timerClient.Tick -= TimerClient_Tick;
-            timerClient = new DispatcherTimer() { Interval = new TimeSpan(0, 0, 0, 0, 500) };
-            timerClient.Tick += TimerClient_Tick;
+            await UpdateWithUI(() =>
+            {
+                timerClient = new DispatcherTimer() { Interval = new TimeSpan(0, 0, 0, 0, 500) };
+                timerClient.Tick += TimerClient_Tick;
+            });
+            //await UpdateWithUI(() =>
+            //{
+            //    timerClient.Start();
+            //});
         }
 
         private void TimerClient_Tick(object sender, object e)
         {
+            timerClient.Stop();
             foreach (var msg in messageListToSendClient)
             {
                 SendClient(msg);
                 Task.Delay(100);
             }
+            timerClient.Start();
         }
     }
 
