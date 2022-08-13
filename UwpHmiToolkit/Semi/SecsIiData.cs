@@ -346,7 +346,6 @@ namespace UwpHmiToolkit.Semi
                         }
                     case (byte)DataItemType.JIS8:
                         {
-                            //TODO: Understand jis8
                             var bs = Encoding.ASCII.GetString(bytes, index, length);
                             J asc = new J(bs);
                             index += length;
@@ -654,7 +653,7 @@ namespace UwpHmiToolkit.Semi
                 sml += "\n";
                 foreach (var item in Items)
                 {
-                    sml += item.ToSML(indentLevel+2);
+                    sml += item.ToSML(indentLevel + 2);
                     sml += "\n";
                 }
                 var result = AddBracket(sml, indentLevel);
@@ -755,7 +754,7 @@ namespace UwpHmiToolkit.Semi
                 var sml = $"Boolean [{Items.Count}]";
                 foreach (var item in Items)
                 {
-                    sml += space + (item == 0 ? "1" : "0");
+                    sml += space + (item == 0 ? "0" : "1");
                 }
 
                 var result = AddBracket(sml, indentLevel);

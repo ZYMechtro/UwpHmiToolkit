@@ -1,18 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
+﻿using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using UwpHmiToolkit.ViewModel;
-using Windows.Networking;
-using System.Net.Sockets;
-using Windows.Networking.Sockets;
-using Windows.Storage.Streams;
-using Windows.UI.Core;
-using System.Net;
-using static UwpHmiToolkit.DataTools.DataTool;
-using System.Threading;
 using static UwpHmiToolkit.Semi.HsmsMessage;
 using static UwpHmiToolkit.Semi.SecsII;
 
@@ -20,6 +7,8 @@ namespace UwpHmiToolkit.Semi
 {
     public partial class Gem
     {
+        const byte onByte = 128, offByte = 0;
+
         private void HandleDataMessage(HsmsMessage request)
         {
             ServerMessageUpdate($"Input : {request.ToSML()}");
@@ -72,14 +61,14 @@ namespace UwpHmiToolkit.Semi
                             case 3: //Selected Equipment Status Request
                                 if (request.WBit)
                                 {
-                                    GotMessageNeedsReply(request);
+                                    GotDataMessage(request);
                                 }
                                 break;
 
                             case 11: //Status Variable Namelist Request
                                 if (request.WBit)
                                 {
-                                    GotMessageNeedsReply(request);
+                                    GotDataMessage(request);
                                 }
                                 break;
 
@@ -141,8 +130,6 @@ namespace UwpHmiToolkit.Semi
                                         if (request.WBit)
                                             SendServer(DataMessageSecondary(request, new B(2)));
                                     }
-
-
                                 }
                                 break;
 
@@ -165,8 +152,36 @@ namespace UwpHmiToolkit.Semi
 
                                 case 37: //Enable/Disable Event Report
                                     {
-                                        if (request.WBit)
-                                            GotMessageNeedsReply(request);
+                                        if (DecodeSecsII(request.MessageText) is L list
+                                            && list.Items.Count() >= 2
+                                            && list.Items[0] is TF ceed
+                                            && list.Items[1] is L ll)
+                                        {
+                                            if (ll.Items.Count() == 0)
+                                            {
+                                                foreach (var ev in Events)
+                                                {
+                                                    ev.CEED.Items[0] = ceed.Items[0];
+                                                }
+                                            }
+                                            else
+                                            {
+                                                var ceids = new List<uint>();
+                                                foreach (U4 ceid in ll.Items)
+                                                {
+                                                    ceids.Add(ceid.Items[0]);
+                                                }
+                                                var matchs = Events.Where(e => ceids.Contains(e.CEID.Items[0]));
+                                                foreach (var ev in matchs)
+                                                {
+                                                    ev.CEED.Items[0] = ceed.Items[0];
+                                                }
+                                            }
+
+                                            SendServer(DataMessageSecondary(request, new B(0)));
+                                        }
+                                        else
+                                            abort = true;
                                     }
                                     break;
 
@@ -234,7 +249,7 @@ namespace UwpHmiToolkit.Semi
                                                         HCACK = 2;
                                                     break;
                                                 default:
-
+                                                    HCACK = 1;
                                                     break;
                                             }
                                         }
@@ -278,22 +293,78 @@ namespace UwpHmiToolkit.Semi
                         {
                             switch (request.Function)
                             {
-                                case 2:
+                                case 2: //Alarm Report Ack
                                     {
-
+                                        if (DecodeSecsII(request.MessageText) is B ackc5
+                                            && !ackc5.IsEmpty)
+                                        {
+                                            //For spooling
+                                        }
+                                        else abort = true;
                                     }
                                     break;
 
-
-                                case 3:
+                                case 3: //Enable/Disable Alarm Send
                                     {
-
+                                        if (DecodeSecsII(request.MessageText) is L list
+                                            && !list.IsEmpty
+                                            && list.Length == 2
+                                            && list.Items[0] is B aled
+                                            && list.Items[1] is U4 alid
+                                            && SwitchAlarmEnable(aled, alid))
+                                        {
+                                            SendServer(DataMessageSecondary(request, new B(0))); //return ACKC5 = 0 ok
+                                        }
+                                        else
+                                            abort = true;
                                     }
                                     break;
 
-                                case 5:
+                                case 5: //List Alarms Request
                                     {
+                                        if (request.WBit)
+                                        {
+                                            if (DecodeSecsII(request.MessageText) is U4 u4)
+                                            {
+                                                var list = new L();
+                                                if (u4.IsEmpty)
+                                                {
+                                                    foreach (var alarm in Alarms)
+                                                    {
+                                                        list.Items.Add(alarm.GetL());
+                                                    }
+                                                    SendServer(DataMessageSecondary(request, list));
+                                                }
+                                                else if (u4.Items[0] is uint alidVector)
+                                                {
+                                                    var alarm = Alarms.Where(al => al.ALID.Items[0] == alidVector);
+                                                    if (alarm.Count() > 0)
+                                                    {
+                                                        list.Items.Add(alarm.First().GetL());
+                                                        SendServer(DataMessageSecondary(request, list));
+                                                    }
+                                                    else
+                                                    {
+                                                        abort = true;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    break;
 
+                                case 7:
+                                    {
+                                        if (request.WBit)
+                                        {
+                                            var list = new L();
+                                            foreach (var alarm in Alarms)
+                                            {
+                                                if (alarm.ALED.Items[0] >= 128)
+                                                    list.Items.Add(alarm.GetL());
+                                            }
+                                            SendServer(DataMessageSecondary(request, list));
+                                        }
                                     }
                                     break;
 
@@ -309,22 +380,27 @@ namespace UwpHmiToolkit.Semi
                             {
                                 case 12:
                                     {
-
+                                        if (DecodeSecsII(request.MessageText) is B ackc6
+                                            && !ackc6.IsEmpty)
+                                        {
+                                            //For spooling
+                                        }
+                                        else abort = true;
                                     }
                                     break;
 
                                 case 15:
                                     {
-
+                                        if (DecodeSecsII(request.MessageText) is U4 u4
+                                            && !u4.IsEmpty
+                                            && u4.Items[0] is uint ceid
+                                            && Events.FirstOrDefault(ev => ev.CEID.Items[0] == ceid) is GemEvent e)
+                                        {
+                                            SendServer(DataMessagePrimary(6, 16, e.GetL()));
+                                        }
+                                        else abort = true;
                                     }
                                     break;
-
-                                case 19:
-                                    {
-
-                                    }
-                                    break;
-
 
                                 default:
                                     abort = true; break;
@@ -412,7 +488,7 @@ namespace UwpHmiToolkit.Semi
             }
 
 
-            if (abort)
+            if (abort && request.WBit)
                 SendServer(DataMessageAbort(request));
         }
 
@@ -438,6 +514,159 @@ namespace UwpHmiToolkit.Semi
             return EncodeSecsII(l);
         }
 
+
+        #region Status
+
+        #endregion /Status
+
+
+        #region Event
+
+        public List<GemEvent> Events = new List<GemEvent>();
+
+        public class GemEvent
+        {
+            /// <summary>
+            /// An identifier to correlate related messages
+            /// </summary>
+            public static U2 DATAID = new U2(0);
+
+            /// <summary>
+            /// Collection event identifier, GEM requires type Un
+            /// </summary>
+            public U4 CEID;
+
+
+            /// <summary>
+            /// Collection event or trace enablement, true is enabled
+            /// </summary>
+            public TF CEED = new TF(true);
+
+            public GemEvent(uint ceid)
+            {
+                CEID = new U4(ceid);
+            }
+
+            public L GetL()
+            {
+                var list = new L();
+                DATAID.Items[0]++;
+                list.Items.Add(DATAID); //DATAID
+                list.Items.Add(CEID);
+                list.Items.Add(new L()); //Add empty list for reports (RPTID, VID, V)
+                return list;
+            }
+        }
+
+        public void SendEventReport(uint ceid)
+        {
+            if (Events.FirstOrDefault(ev => ev.CEID.Items[0] == ceid) is GemEvent e
+                && e.CEED.Items[0] > 0)
+                messageListToSend.Add(DataMessagePrimary(6, 11, e.GetL()));
+        }
+
+        #endregion /Event
+
+
+        #region Alarm
+
+        public List<GemAlarm> Alarms = new List<GemAlarm>();
+
+        public class GemAlarm
+        {
+            /// <summary>
+            /// Alarm type ID
+            /// </summary>
+            public U4 ALID { get; }
+
+            /// <summary>
+            /// Alarm text
+            /// </summary>
+            public A ALTX { get; }
+
+            /// <summary>
+            /// Enable/disable alarm, 128 means enable, 0 disable
+            /// </summary>
+            public B ALED { get; } = new B(128);
+
+            /// <summary>
+            /// Alarm code byte, >= 128 alarm is on
+            /// </summary>
+            public B ALCD { get; } = new B(0);
+
+            public GemAlarm(uint alid, string altx)
+            {
+                ALID = new U4(alid);
+                ALTX = new A(altx);
+            }
+
+            public L GetL()
+            {
+                var list = new L();
+                list.Items.Add(ALCD);
+                list.Items.Add(ALID);
+                list.Items.Add(ALTX);
+                return list;
+            }
+
+        }
+
+        public void ChangeAlarmState(bool on, uint alid)
+        {
+            byte newState = on ? onByte : offByte;
+            var u4 = new U4(alid);
+            var matchItems = Alarms.Where(alarm => alarm.ALID.Items[0] == u4.Items[0]);
+            foreach (var item in matchItems)
+            {
+                if (item.ALCD.Items[0] != newState)
+                {
+                    item.ALCD.Items[0] = newState;
+
+                    //SendReport if enable (ALED)
+                    if (item.ALED.ValueInBytes[0] == onByte)
+                        SendAlarmReport(item);
+                }
+            }
+        }
+
+        private void SendAlarmReport(GemAlarm gemAlarm)
+        {
+            var list = new L();
+            list.Items.Add(gemAlarm.ALCD);
+            list.Items.Add(gemAlarm.ALID);
+            list.Items.Add(gemAlarm.ALTX);
+            messageListToSend.Add(DataMessagePrimary(5, 1, list));
+        }
+
+        private bool SwitchAlarmEnable(B enable, U4 alid)
+        {
+            if (alid.Items[0] == 0)
+            {
+                //Set all alarm
+                foreach (var alarm in Alarms)
+                {
+                    alarm.ALED.Items[0] = enable.Items[0];
+                }
+                return true;
+            }
+            else
+            {
+                var matchItems = Alarms.Where(alarm => alarm.ALID.ValueInBytes == alid.ValueInBytes);
+                if (matchItems.Count() > 0)
+                {
+                    foreach (var alarm in Alarms)
+                    {
+                        alarm.ALED.Items[0] = enable.Items[0];
+                    }
+                    return true;
+                }
+                else
+                    return false;
+            }
+        }
+
+
+        #endregion /Alarm
 
     }
 }

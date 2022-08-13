@@ -244,7 +244,7 @@ namespace UwpHmiToolkit.Protocol.McProtocol
             {
                 foreach (var b in bitDevices)
                 {
-                    if ((lastType != b.DeviceType && index != 0) || lastChannel != b.Channel)
+                    if ((lastType != b.DeviceType && lastType != "") || lastChannel != b.Channel)
                         index++;
 
                     deviceIndexPairs.Add(b, index);

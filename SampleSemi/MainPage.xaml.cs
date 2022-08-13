@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices.WindowsRuntime;
+using System.Threading.Tasks;
 using UwpHmiToolkit.Semi;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
@@ -27,6 +28,13 @@ namespace SampleSemi
         {
             this.InitializeComponent();
             MySemi = new Gem(hsmsSetting, this.Dispatcher);
+            MySemi.Events.Add(new Gem.GemEvent(1));
+            MySemi.Events.Add(new Gem.GemEvent(2));
+            MySemi.Events.Add(new Gem.GemEvent(3));
+            MySemi.Alarms.Add(new Gem.GemAlarm(10, "Alarm10"));
+            MySemi.Alarms.Add(new Gem.GemAlarm(11, "Alarm11"));
+            MySemi.Alarms.Add(new Gem.GemAlarm(12, "Alarm12"));
+
             MySemi.ServerMessageUpdate += MySemi_ServerMessageUpdate;
             MySemi.ClientMessageUpdate += MySemi_ClientMessageUpdate;
 
@@ -59,12 +67,11 @@ namespace SampleSemi
             MySemi.Stop();
         }
 
-        private void Button_Send_Click(object sender, RoutedEventArgs e)
+        private async void Button_Send_Click(object sender, RoutedEventArgs e)
         {
-            var bs = MySemi.RcmdReply(5);
-            
-            ClientListBox.Items.Insert(0, DecodeSecsII(bs).ToSML(0));
-        
+            MySemi.SendEventReport(1);
+            await Task.Delay(3000);
+            MySemi.SendEventReport(2);
         }
 
     }
