@@ -27,6 +27,10 @@ namespace SampleSemi
         public MainPage()
         {
             this.InitializeComponent();
+            hsmsSetting.LocalIpAddress = "192.168.1.105";
+            hsmsSetting.LocalPort = "5000";
+            hsmsSetting.TargetIpAddress = "192.168.1.106";
+            hsmsSetting.TargetPort = "5000";
             MySemi = new Gem(hsmsSetting, this.Dispatcher);
             MySemi.Events.Add(new Gem.GemEvent(1));
             MySemi.Events.Add(new Gem.GemEvent(2));
@@ -34,20 +38,14 @@ namespace SampleSemi
             MySemi.Alarms.Add(new Gem.GemAlarm(10, "Alarm10"));
             MySemi.Alarms.Add(new Gem.GemAlarm(11, "Alarm11"));
             MySemi.Alarms.Add(new Gem.GemAlarm(12, "Alarm12"));
+            MySemi.Statuses.Add(new Gem.GemStatus(1, new F4(0.354f), "Ratio", "%"));
+            MySemi.Statuses.Add(new Gem.GemStatus(2, new U4(154), "Count"));
 
-            MySemi.ServerMessageUpdate += MySemi_ServerMessageUpdate;
-            MySemi.ClientMessageUpdate += MySemi_ClientMessageUpdate;
+            MySemi.MessageRecord += MySemi_ServerMessageUpdate;
 
-            MySemi.Start();
+            //MySemi.Start();
         }
 
-        private async void MySemi_ClientMessageUpdate(string message)
-        {
-            await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
-            {
-                ClientListBox.Items.Insert(0, message);
-            });
-        }
 
         private async void MySemi_ServerMessageUpdate(string message)
         {
@@ -59,6 +57,8 @@ namespace SampleSemi
 
         private void Button_Start_Click(object sender, RoutedEventArgs e)
         {
+            MySemi.Stop();
+
             MySemi.Start();
         }
 
@@ -67,12 +67,16 @@ namespace SampleSemi
             MySemi.Stop();
         }
 
-        private async void Button_Send_Click(object sender, RoutedEventArgs e)
+        private void Button_Send_Click(object sender, RoutedEventArgs e)
         {
-            MySemi.SendEventReport(1);
-            await Task.Delay(3000);
-            MySemi.SendEventReport(2);
+            MySemi.EstablishComm();
         }
 
+        private void Pb_Role_Click(object sender, RoutedEventArgs e)
+        {
+            hsmsSetting.Mode = hsmsSetting.Mode == HsmsSetting.ConnectionMode.Passive
+                ? HsmsSetting.ConnectionMode.Active
+                : HsmsSetting.ConnectionMode.Passive;
+        }
     }
 }

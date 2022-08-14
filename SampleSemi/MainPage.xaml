@@ -14,15 +14,14 @@
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
-            <ColumnDefinition MinWidth="500"  Width="Auto"/>
+            <ColumnDefinition MinWidth="500"
+                              Width="Auto" />
             <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
 
         <ListBox x:Name="ServerListBox"
-                 Margin="5" />
-        <ListBox x:Name="ClientListBox"
-                 Grid.Row="1"
-                 Margin="5" />
+                 Margin="5"
+                 Grid.RowSpan="2" />
 
         <StackPanel Grid.Column="1"
                     Grid.RowSpan="2"
@@ -84,11 +83,11 @@
             <StackPanel>
 
                 <TextBlock Text="Role:" />
-                <ComboBox x:Name="ComboBox_Role"
-                          Margin="5">
-                    <ComboBoxItem Content="Passive" />
-                    <ComboBoxItem Content="Active" />
-                </ComboBox>
+                <Button x:Name="Pb_Role"
+                        Click="Pb_Role_Click"
+                        Content="{x:Bind hsmsSetting.Mode, Mode=OneWay}"
+                        Margin="5" />
+
             </StackPanel>
             <StackPanel>
                 <TextBlock Text="T3" />

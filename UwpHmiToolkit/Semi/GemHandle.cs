@@ -1,5 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using Windows.Media.Capture.Core;
+using Windows.Services.Maps;
 using static UwpHmiToolkit.Semi.HsmsMessage;
 using static UwpHmiToolkit.Semi.SecsII;
 
@@ -11,7 +13,7 @@ namespace UwpHmiToolkit.Semi
 
         private void HandleDataMessage(HsmsMessage request)
         {
-            ServerMessageUpdate($"Input : {request.ToSML()}");
+            MessageRecord($"Input : {request.ToSML()}");
             bool abort = false;
 
             //Refuse message conditions
@@ -46,7 +48,7 @@ namespace UwpHmiToolkit.Semi
                                         var info = new L();
                                         info.Items.Add(new A(EquipmentInfo.MDLN));
                                         info.Items.Add(new A(EquipmentInfo.SOFTREV));
-                                        SendServer(DataMessageSecondary(request, info));
+                                        Send(DataMessageSecondary(request, info));
                                     }
                                 }
                                 break;
@@ -61,14 +63,81 @@ namespace UwpHmiToolkit.Semi
                             case 3: //Selected Equipment Status Request
                                 if (request.WBit)
                                 {
-                                    GotDataMessage(request);
+                                    var svids = new List<uint>();
+                                    if (DecodeSecsII(request.MessageText) is L list)
+                                    {
+                                        var l = new L();
+                                        if (list.IsEmpty)
+                                        {
+                                            foreach (var sv in Statuses)
+                                            {
+                                                l.Items.Add(sv.Data);
+                                            }
+                                        }
+                                        else
+                                        {
+                                            foreach (var svid in list.Items.OfType<U4>())
+                                            {
+                                                if (!svid.IsEmpty)
+                                                    svids.Add(svid.Items[0]);
+                                            }
+                                            foreach (var svid in svids)
+                                            {
+                                                var match = Statuses.FirstOrDefault(sv => sv.SVID.Items[0] == svid);
+                                                if (match is null)
+                                                {
+                                                    abort = true;
+                                                    break;
+                                                }
+                                                else
+                                                    l.Items.Add(match.Data);
+                                            }
+                                        }
+                                        if (!abort)
+                                            Send(DataMessageSecondary(request, l));
+                                    }
+                                    else
+                                        abort = true;
                                 }
                                 break;
 
                             case 11: //Status Variable Namelist Request
                                 if (request.WBit)
                                 {
-                                    GotDataMessage(request);
+                                    if (DecodeSecsII(request.MessageText) is L list)
+                                    {
+                                        var l = new L();
+                                        if (list.IsEmpty) //List all
+                                        {
+                                            foreach (var sv in Statuses)
+                                            {
+                                                l.Items.Add(sv.GetL());
+                                            }
+                                        }
+                                        else
+                                        {
+                                            var svids = new List<uint>();
+
+                                            foreach (var svid in list.Items.OfType<U4>())
+                                            {
+                                                if (!svid.IsEmpty)
+                                                    svids.Add(svid.Items[0]);
+                                            }
+                                            foreach (var svid in svids)
+                                            {
+                                                var match = Statuses.FirstOrDefault(sv => sv.SVID.Items[0] == svid);
+                                                if (match is null)
+                                                {
+                                                    abort = true;
+                                                    break;
+                                                }
+                                                else
+                                                    l.Items.Add(match.GetL());
+                                            }
+                                        }
+                                        if (!abort)
+                                            Send(DataMessageSecondary(request, l));
+                                    }
                                 }
                                 break;
 
@@ -88,7 +157,7 @@ namespace UwpHmiToolkit.Semi
                                             info.Items.Add(new A(EquipmentInfo.SOFTREV));
                                             L.Items.Add(new B(0));
                                             L.Items.Add(info);
-                                            SendServer(DataMessageSecondary(request, L));
+                                            Send(DataMessageSecondary(request, L));
                                         }
                                     }
                                 }
@@ -97,7 +166,7 @@ namespace UwpHmiToolkit.Semi
                             case 14: //Establish Communications Request Acknowledge
                                 {
                                     if (CurrentCommunicationState == CommunicationState.Enable_WaitCra
-                                        && (lastSentMessageServer.Stream, lastSentMessageServer.Function) == (1, 13))
+                                        && (lastSentMessage.Stream, lastSentMessage.Function) == (1, 13))
                                     {
                                         var item = DecodeSecsII(request.MessageText);
                                         if (item is L list && list.Items.Count == 2 && list.Items[0] is B b && b.Items[0] == 0)
@@ -111,7 +180,7 @@ namespace UwpHmiToolkit.Semi
                                 {
                                     SwitchControlState(ControlState.Offline_HostOffline);
                                     if (request.WBit)
-                                        SendServer(DataMessageSecondary(request, new B(0)));
+                                        Send(DataMessageSecondary(request, new B(0)));
                                 }
                                 break;
 
@@ -122,13 +191,13 @@ namespace UwpHmiToolkit.Semi
                                     {
                                         SwitchControlState(ControlState.Online_Local);
                                         if (request.WBit)
-                                            SendServer(DataMessageSecondary(request, new B(0)));
+                                            Send(DataMessageSecondary(request, new B(0)));
                                     }
                                     else if (CurrentControlState == ControlState.Online_Local
                                         || CurrentControlState == ControlState.Online_Remote)
                                     {
                                         if (request.WBit)
-                                            SendServer(DataMessageSecondary(request, new B(2)));
+                                            Send(DataMessageSecondary(request, new B(2)));
                                     }
                                 }
                                 break;
@@ -146,7 +215,7 @@ namespace UwpHmiToolkit.Semi
                                     {
                                         if (request.WBit
                                             && DecodeSecsII(request.MessageText) is B bs)
-                                            SendServer(DataMessageSecondary(request, request.MessageText));
+                                            Send(DataMessageSecondary(request, request.MessageText));
                                     }
                                     break;
 
@@ -167,7 +236,7 @@ namespace UwpHmiToolkit.Semi
                                             else
                                             {
                                                 var ceids = new List<uint>();
-                                                foreach (U4 ceid in ll.Items)
+                                                foreach (var ceid in ll.Items.OfType<U4>())
                                                 {
                                                     ceids.Add(ceid.Items[0]);
                                                 }
@@ -178,7 +247,7 @@ namespace UwpHmiToolkit.Semi
                                                 }
                                             }
 
-                                            SendServer(DataMessageSecondary(request, new B(0)));
+                                            Send(DataMessageSecondary(request, new B(0)));
                                         }
                                         else
                                             abort = true;
@@ -258,7 +327,7 @@ namespace UwpHmiToolkit.Semi
                                             HCACK = 1;
                                         }
 
-                                        SendServer(DataMessageSecondary(request, RcmdReply(HCACK)));
+                                        Send(DataMessageSecondary(request, RcmdReply(HCACK)));
                                     }
                                     break;
 
@@ -313,7 +382,7 @@ namespace UwpHmiToolkit.Semi
                                             && list.Items[1] is U4 alid
                                             && SwitchAlarmEnable(aled, alid))
                                         {
-                                            SendServer(DataMessageSecondary(request, new B(0))); //return ACKC5 = 0 ok
+                                            Send(DataMessageSecondary(request, new B(0))); //return ACKC5 = 0 ok
                                         }
                                         else
                                             abort = true;
@@ -333,7 +402,7 @@ namespace UwpHmiToolkit.Semi
                                                     {
                                                         list.Items.Add(alarm.GetL());
                                                     }
-                                                    SendServer(DataMessageSecondary(request, list));
+                                                    Send(DataMessageSecondary(request, list));
                                                 }
                                                 else if (u4.Items[0] is uint alidVector)
                                                 {
@@ -341,7 +410,7 @@ namespace UwpHmiToolkit.Semi
                                                     if (alarm.Count() > 0)
                                                     {
                                                         list.Items.Add(alarm.First().GetL());
-                                                        SendServer(DataMessageSecondary(request, list));
+                                                        Send(DataMessageSecondary(request, list));
                                                     }
                                                     else
                                                     {
@@ -363,7 +432,7 @@ namespace UwpHmiToolkit.Semi
                                                 if (alarm.ALED.Items[0] >= 128)
                                                     list.Items.Add(alarm.GetL());
                                             }
-                                            SendServer(DataMessageSecondary(request, list));
+                                            Send(DataMessageSecondary(request, list));
                                         }
                                     }
                                     break;
@@ -396,7 +465,7 @@ namespace UwpHmiToolkit.Semi
                                             && u4.Items[0] is uint ceid
                                             && Events.FirstOrDefault(ev => ev.CEID.Items[0] == ceid) is GemEvent e)
                                         {
-                                            SendServer(DataMessagePrimary(6, 16, e.GetL()));
+                                            Send(DataMessagePrimary(6, 16, e.GetL()));
                                         }
                                         else abort = true;
                                     }
@@ -489,18 +558,19 @@ namespace UwpHmiToolkit.Semi
 
 
             if (abort && request.WBit)
-                SendServer(DataMessageAbort(request));
+                Send(DataMessageAbort(request));
         }
 
-        private void EstablishComm()
+        public void EstablishComm()
         {
-            if (CurrentCommunicationState != CommunicationState.Enable_Communicating)
+            if (CurrentHsmsState == HsmsState.Selected
+                && CurrentCommunicationState != CommunicationState.Enable_Communicating)
             {
                 SwitchCommState(CommunicationState.Enable_WaitCra);
                 var info = new L();
                 info.Items.Add(new A(EquipmentInfo.MDLN));
                 info.Items.Add(new A(EquipmentInfo.SOFTREV));
-                SendServer(DataMessagePrimary(1, 13, info));
+                messageListToSend.Add(DataMessagePrimary(1, 13, info));
             }
 
         }
@@ -517,12 +587,49 @@ namespace UwpHmiToolkit.Semi
 
         #region Status
 
+        public List<GemStatus> Statuses = new List<GemStatus>();
+
+        public class GemStatus
+        {
+            public U4 SVID;
+
+            public SecsDataBase Data;
+
+            public A SVNAME;
+
+            public A UNITS;
+
+            public GemStatus(uint svid, SecsDataBase data, string svName, string unit = null)
+            {
+                SVID = new U4(svid);
+                Data = data;
+                SVNAME = new A(svName);
+                UNITS = new A(unit);
+            }
+
+            public L GetL()
+            {
+                var list = new L();
+                list.Items.Add(SVID);
+                list.Items.Add(SVNAME);
+                list.Items.Add(UNITS);
+                return list;
+            }
+        }
+
+
         #endregion /Status
 
 
         #region Event
 
-        public List<GemEvent> Events = new List<GemEvent>();
+        public List<GemEvent> Events = new List<GemEvent>()
+        {
+            new GemEvent(3),
+            new GemEvent(8),
+            new GemEvent(9),
+            new GemEvent(22),
+        };
 
         public class GemEvent
         {
@@ -560,9 +667,10 @@ namespace UwpHmiToolkit.Semi
 
         public void SendEventReport(uint ceid)
         {
-            if (Events.FirstOrDefault(ev => ev.CEID.Items[0] == ceid) is GemEvent e
-                && e.CEED.Items[0] > 0)
-                messageListToSend.Add(DataMessagePrimary(6, 11, e.GetL()));
+            if (CurrentCommunicationState == CommunicationState.Enable_Communicating)
+                if (Events.FirstOrDefault(ev => ev.CEID.Items[0] == ceid) is GemEvent e
+                    && e.CEED.Items[0] > 0)
+                    messageListToSend.Add(DataMessagePrimary(6, 11, e.GetL()));
         }
 
         #endregion /Event

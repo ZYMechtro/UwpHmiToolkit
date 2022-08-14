@@ -675,7 +675,8 @@ namespace UwpHmiToolkit.Semi
 
             public A(string str)
             {
-                Items = str.ToList();
+                if (str != null)
+                    Items = str.ToList();
             }
 
             public A(params char[] chars)
@@ -772,7 +773,8 @@ namespace UwpHmiToolkit.Semi
 
             public J(string str)
             {
-                Items = str.ToList();
+                if (str != null)
+                    Items = str.ToList();
             }
             public J(params char[] chars)
             {

@@ -236,10 +236,11 @@ namespace UwpHmiToolkit.Semi
 
         public byte[] DeviceId { get; set; } = new byte[2] { 0x00, 0x00 };
 
-        public string TargetIpAddress { get; } = "127.0.0.1";
-        public string LocalIpAddress { get; } = "127.0.0.1";
-        public string TargetPort { get; } = "5000";
-        public string LocalPort { get; } = "5000";
+        public string TargetIpAddress { get; set; } = "127.0.0.1";
+        public string LocalIpAddress { get; set; } = "127.0.0.1";
+        public string TargetPort { get; set; } = "5000";
+        public string LocalPort { get; set; } = "5000";
+
     }
 
 }
