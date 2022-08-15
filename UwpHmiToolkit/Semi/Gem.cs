@@ -25,17 +25,16 @@ namespace UwpHmiToolkit.Semi
 
         public EquipmentInfo EquipmentInfo { get; set; } = new EquipmentInfo();
 
-        protected StreamSocket tcpSocket; //tcpSocketClient
-        //protected Stream inputStreamClient, outputStreamClient;
+        protected StreamSocket tcpSocket;
+
         protected Stream inputStream, outputStream;
 
-        //bool waitingReplyClient = false;
         bool waitingReply = false;
         readonly List<HsmsMessage> messageListToSend = new List<HsmsMessage>();
 
-        HsmsMessage lastSentMessage; //, lastSentMessageClient;
+        HsmsMessage lastSentMessage;
 
-        CancellationTokenSource cts; //, ctsClient;
+        CancellationTokenSource cts;
 
 
         #region StateModel
@@ -64,11 +63,9 @@ namespace UwpHmiToolkit.Semi
                 case ControlState.Online_Remote:
                     SendEventReport(9);
                     break;
-
             }
         }
-
-        public async void SwitchProcessingState(ProcessingState newState) => await UpdateWithUI(() => CurrentProcessingState = newState);
+        public async void SwitchProcessState(ProcessingState newState) => await UpdateWithUI(() => CurrentProcessingState = newState);
         public async void SwitchSpoolState(SpoolingState newState) => await UpdateWithUI(() => CurrentSpoolingState = newState);
         #endregion /StateModel
 
@@ -79,22 +76,22 @@ namespace UwpHmiToolkit.Semi
             this.dispatcher = coreDispatcher;
         }
 
-        public void Start()
+        public async void Start()
         {
             cts?.Cancel();
 
             if (HsmsSetting.Mode == HsmsSetting.ConnectionMode.Passive)
-                StartServer();
+                await StartServer();
             else
-                StartClient();
+                await StartClient();
         }
 
         public void Stop()
         {
-            cts?.Cancel();
+            SeperateReq();
         }
 
-        private async void StartServer()
+        private async Task StartServer()
         {
             tcpSocket?.Dispose();
 
@@ -105,6 +102,7 @@ namespace UwpHmiToolkit.Semi
                 SwitchCommState(CommunicationState.Enable_WaitCrFromHost);
                 var streamSocketListener = new StreamSocketListener();
                 streamSocketListener.ConnectionReceived += this.StreamSocketListener_ConnectionReceived;
+                streamSocketListener.Control.NoDelay = true;
                 await streamSocketListener.BindServiceNameAsync(HsmsSetting.LocalPort);
 
                 MessageRecord("Server is listening...");
@@ -119,7 +117,7 @@ namespace UwpHmiToolkit.Semi
             }
         }
 
-        private void StreamSocketListener_ConnectionReceived(StreamSocketListener sender, StreamSocketListenerConnectionReceivedEventArgs args)
+        private async void StreamSocketListener_ConnectionReceived(StreamSocketListener sender, StreamSocketListenerConnectionReceivedEventArgs args)
         {
             if (HsmsSetting.Mode == HsmsSetting.ConnectionMode.Passive)
             {
@@ -134,29 +132,24 @@ namespace UwpHmiToolkit.Semi
                     inputStream = tcpSocket.InputStream.AsStreamForRead();
                     outputStream = tcpSocket.OutputStream.AsStreamForWrite();
 
-                    StartListening();
+                    await StartListening();
 
-                    MessageRecord("Server is listening...");
                 }
             }
         }
 
-        private async void StartClient()
+        private async Task StartClient()
         {
             if (HsmsSetting.Mode == HsmsSetting.ConnectionMode.Active && CurrentHsmsState == HsmsState.NotConnected)
             {
                 try
                 {
                     tcpSocket?.Dispose();
-                    //new TcpClient(HsmsSetting.TargetIpAddress, int.Parse(HsmsSetting.TargetPort)).Close();
 
                     tcpSocket = new StreamSocket();
-                    //var localHoat = new HostName(HsmsSetting.LocalIpAddress);
                     var targetHost = new HostName(HsmsSetting.TargetIpAddress);
-                    //EndpointPair endpointPair = new EndpointPair(localHoat, "5000", targetHost, "5000");
                     MessageRecord("Client is trying to connect...");
                     await tcpSocket.ConnectAsync(targetHost, HsmsSetting.TargetPort);
-                    //await tcpSocket.ConnectAsync(endpointPair);
                     MessageRecord("Client connected");
                     outputStream = tcpSocket.OutputStream.AsStreamForWrite();
                     inputStream = tcpSocket.InputStream.AsStreamForRead();
@@ -165,12 +158,15 @@ namespace UwpHmiToolkit.Semi
                         if (CurrentHsmsState == HsmsState.NotConnected)
                         {
                             SwitchHsmsState(HsmsState.NotSelected);
+                            SwitchCommState(CommunicationState.Enable_WaitCra);
                             MessageRecord($"A new connection is established, State: [NotSelected]");
                             messageListToSend.Add(ControlMessagePrimary(STypes.SelectReq));
                         }
                     }
 
-                    StartListening();
+                    await StartListening();
+                    tcpSocket?.Dispose();
+                    tcpSocket = null;
                 }
                 catch (Exception ex)
                 {
@@ -188,8 +184,10 @@ namespace UwpHmiToolkit.Semi
 
         }
 
-        private async void StartListening()
+        private async Task StartListening()
         {
+            const int bufferSize = 7_995_148;
+            //const int bufferSize = 4096;
             int bytesQtyWaiting = 0;
             byte[] inputStack = new byte[0];
 
@@ -198,11 +196,11 @@ namespace UwpHmiToolkit.Semi
             cts = new CancellationTokenSource();
             while (!separate)
             {
-                byte[] buffer = new byte[7_995_148];
+                byte[] buffer = new byte[bufferSize];
 
                 try
                 {
-                    var length = await inputStream.ReadAsync(buffer, 0, 7_995_148);
+                    var length = await inputStream.ReadAsync(buffer, 0, bufferSize, cts.Token);
 
                     if (length > 0)
                     {
@@ -308,6 +306,8 @@ namespace UwpHmiToolkit.Semi
                             }
                         }
                     }
+                    else
+                        await Task.Delay(50);
 
                     switch (CurrentHsmsState)
                     {
@@ -336,59 +336,58 @@ namespace UwpHmiToolkit.Semi
                 catch (Exception ex)
                 {
                     separate = true;
-                    if (cts.IsCancellationRequested)
-                    {
-                        Send(ControlMessagePrimary(STypes.SeparateReq));
-                        await Task.Delay(1000);
-                    }
                 }
             }
             SwitchHsmsState(HsmsState.NotConnected);
-            SwitchControlState(ControlState.Offline_HostOffline);
-            SwitchCommState(CommunicationState.Enable_WaitCrFromHost);
+            if (cts.IsCancellationRequested)
+            {
+                SwitchControlState(ControlState.Offline_EqpOffline);
+                SwitchCommState(CommunicationState.Disable);
+            }
+            else
+            {
+                SwitchControlState(ControlState.Offline_HostOffline);
+                SwitchCommState(CommunicationState.Enable_WaitCrFromHost);
+            }
         }
 
-        bool sendingServer; //, sendingClient;
+        public void EstablishComm()
+        {
+            if (CurrentHsmsState == HsmsState.Selected
+                && CurrentCommunicationState != CommunicationState.Enable_Communicating)
+            {
+                SwitchCommState(CommunicationState.Enable_WaitCra);
+                var info = new L();
+                info.Items.Add(new A(EquipmentInfo.MDLN));
+                info.Items.Add(new A(EquipmentInfo.SOFTREV));
+                messageListToSend.Add(DataMessagePrimary(1, 13, info));
+            }
 
-        //public async void SendClient(HsmsMessage hsmsMessage)
-        //{
-        //    if (tcpSocket != null && outputStream != null)
-        //    {
-        //        try
-        //        {
-        //            var msg = hsmsMessage.MessageToSend;
-        //            await outputStreamClient.WriteAsync(msg, 0, msg.Length);
-        //            await outputStreamClient.FlushAsync();
-        //            ClientMessageUpdate(string.Format($"Sent : {BitConverter.ToString(msg)}"));
+        }
 
-        //            inputStreamClient = tcpSocketClient.InputStream.AsStreamForRead();
-        //            byte[] buffer = new byte[4096];
-        //            var length = await inputStreamClient.ReadAsync(buffer, 0, 4096);
-        //            if (length > 0)
-        //            {
-        //                var source = new byte[length];
-        //                Array.Copy(buffer, 0, source, 0, length);
-        //                ClientMessageUpdate($"Input: {BitConverter.ToString(source)}");
-        //            }
+        public void SeperateReq()
+        {
+            if (tcpSocket != null)
+            {
+                Send(ControlMessagePrimary(STypes.SeparateReq));
+            }
+            SwitchHsmsState(HsmsState.NotConnected);
+            SwitchCommState(CommunicationState.Disable);
+            if (cts != null && cts.IsCancellationRequested)
+                SwitchControlState(ControlState.Offline_EqpOffline);
+            else
+                SwitchControlState(ControlState.Offline_HostOffline);
 
-        //        }
-        //        catch
-        //        {
-        //            tcpSocketClient?.Dispose();
-        //            ClientMessageUpdate(string.Format($"Clent send fail..."));
-        //        }
+            cts?.Cancel();
+            tcpSocket?.Dispose();
+            tcpSocket = null;
+        }
 
-        //    }
-        //}
+        bool sendingServer;
 
         public async void Send(HsmsMessage hsmsMessage)
         {
-            if (outputStream != null) //&&
-                                      //(
-                                      //    hsmsMessage.SType != STypes.DataMessage ||
-                                      //    (hsmsMessage.SType == STypes.DataMessage && CurrentCommunicationState == CommunicationState.Enable_Communicating)
-                                      //)
-                                      //)
+            if (outputStream != null)
             {
                 bool sended = false;
                 try
@@ -401,8 +400,8 @@ namespace UwpHmiToolkit.Semi
                         else
                         {
                             sendingServer = true;
-                            await outputStream.WriteAsync(msg, 0, msg.Length);
-                            await outputStream.FlushAsync();
+                            await outputStream.WriteAsync(msg, 0, msg.Length, cts.Token);
+                            await outputStream.FlushAsync(cts.Token);
                             lastSentMessage = hsmsMessage;
                             sended = true;
                             MessageRecord(string.Format($"Sent : " + hsmsMessage.ToSML()));
@@ -412,6 +411,11 @@ namespace UwpHmiToolkit.Semi
                     {
                         //waitingReply = true;
                     }
+                }
+                catch (OperationCanceledException oce)
+                {
+                    MessageRecord(string.Format($"Sending be cancelled..."));
+
                 }
                 catch (Exception ex)
                 {
@@ -424,22 +428,11 @@ namespace UwpHmiToolkit.Semi
             }
         }
 
-        //public void AddMessageToSend(HsmsMessage hsmsMessage) => messageListToSend.Add(hsmsMessage);
-
         public delegate void ServerMessageHandler(string message);
         public event ServerMessageHandler MessageRecord;
 
-        //public delegate void ClientMessageHandler(string message);
-        //public event ClientMessageHandler ClientMessageUpdate;
-
-        //public delegate void GotMessageHandler(HsmsMessage request);
-        //public event GotMessageHandler GotMessage;
-
         public delegate HsmsMessage GotMessageNeedsReplyHandler(HsmsMessage request);
         public event GotMessageNeedsReplyHandler GotDataMessage;
-
-        //public delegate void RcmdHandler(HsmsMessage request,string rcmd);
-        //public event RcmdHandler RcmdRequest;
 
         DispatcherTimer timer;
 
@@ -469,38 +462,6 @@ namespace UwpHmiToolkit.Semi
             messageListToSend.Clear();
             timer.Start();
         }
-
-
-        //private async void SetupTimerClient()
-        //{
-        //    messageListToSend.Clear();
-        //    if (timerClient != null)
-        //        timerClient.Tick -= TimerClient_Tick;
-        //    await UpdateWithUI(() =>
-        //    {
-        //        timerClient = new DispatcherTimer() { Interval = new TimeSpan(0, 0, 0, 0, 500) };
-        //        timerClient.Tick += TimerClient_Tick;
-        //    });
-        //    await UpdateWithUI(() =>
-        //    {
-        //        timerClient.Start();
-        //    });
-        //}
-
-        //private void TimerClient_Tick(object sender, object e)
-        //{
-        //    timerClient.Stop();
-        //    for (int i = 0; i < messageListToSend.Count; i++)
-        //    {
-        //        SendClient(messageListToSend[i]);
-        //        Task.Delay(100);
-        //    }
-        //    messageListToSend.Clear();
-        //    timerClient.Start();
-        //}
-
     }
-
-
 
 }

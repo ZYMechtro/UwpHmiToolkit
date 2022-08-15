@@ -35,7 +35,6 @@ namespace UwpHmiToolkit.Semi
 
             if (!abort)
             {
-                //TODO: Finish functions
                 switch (request.Stream)
                 {
                     case 1: //Tool Status
@@ -270,7 +269,7 @@ namespace UwpHmiToolkit.Semi
                                             {
                                                 case "START":
                                                     if (CurrentProcessingState == ProcessingState.Idle)
-                                                        SwitchProcessingState(ProcessingState.Ready);
+                                                        SwitchProcessState(ProcessingState.Ready);
                                                     else if (CurrentProcessingState == ProcessingState.Ready)
                                                         HCACK = 5;
                                                     else
@@ -279,7 +278,7 @@ namespace UwpHmiToolkit.Semi
                                                 case "STOP":
                                                     if (CurrentProcessingState == ProcessingState.Ready
                                                         || CurrentProcessingState == ProcessingState.PauseOnReady)
-                                                        SwitchProcessingState(ProcessingState.Idle);
+                                                        SwitchProcessState(ProcessingState.Idle);
                                                     else if (CurrentProcessingState == ProcessingState.Idle)
                                                         HCACK = 5;
                                                     else
@@ -287,7 +286,7 @@ namespace UwpHmiToolkit.Semi
                                                     break;
                                                 case "PAUSE":
                                                     if (CurrentProcessingState == ProcessingState.Ready)
-                                                        SwitchProcessingState(ProcessingState.PauseOnReady);
+                                                        SwitchProcessState(ProcessingState.PauseOnReady);
                                                     else if (CurrentProcessingState == ProcessingState.PauseOnReady)
                                                         HCACK = 5;
                                                     else
@@ -295,7 +294,7 @@ namespace UwpHmiToolkit.Semi
                                                     break;
                                                 case "RESUME":
                                                     if (CurrentProcessingState == ProcessingState.PauseOnReady)
-                                                        SwitchProcessingState(ProcessingState.Ready);
+                                                        SwitchProcessState(ProcessingState.Ready);
                                                     else if (CurrentProcessingState == ProcessingState.Ready)
                                                         HCACK = 5;
                                                     else
@@ -556,23 +555,8 @@ namespace UwpHmiToolkit.Semi
                 }
             }
 
-
             if (abort && request.WBit)
                 Send(DataMessageAbort(request));
-        }
-
-        public void EstablishComm()
-        {
-            if (CurrentHsmsState == HsmsState.Selected
-                && CurrentCommunicationState != CommunicationState.Enable_Communicating)
-            {
-                SwitchCommState(CommunicationState.Enable_WaitCra);
-                var info = new L();
-                info.Items.Add(new A(EquipmentInfo.MDLN));
-                info.Items.Add(new A(EquipmentInfo.SOFTREV));
-                messageListToSend.Add(DataMessagePrimary(1, 13, info));
-            }
-
         }
 
         public byte[] RcmdReply(byte hcack)
@@ -617,9 +601,7 @@ namespace UwpHmiToolkit.Semi
             }
         }
 
-
         #endregion /Status
-
 
         #region Event
 
@@ -674,7 +656,6 @@ namespace UwpHmiToolkit.Semi
         }
 
         #endregion /Event
-
 
         #region Alarm
 
@@ -772,7 +753,6 @@ namespace UwpHmiToolkit.Semi
                     return false;
             }
         }
-
 
         #endregion /Alarm
 
