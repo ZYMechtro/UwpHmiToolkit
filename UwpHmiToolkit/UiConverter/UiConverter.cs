@@ -45,7 +45,7 @@ namespace UwpHmiToolkit.UiConverter
 
         public object ConvertBack(object value, Type targetType, object parameter, string language)
         {
-            throw new NotImplementedException();
+            return value is string str && int.TryParse(str, out var number) ? number : 0;
         }
     }
 
@@ -119,5 +119,48 @@ namespace UwpHmiToolkit.UiConverter
             throw new NotImplementedException();
         }
     }
+
+
+    public class UshortToStringConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, string language)
+        {
+            return value is ushort i ? i.ToString() : throw new ArgumentException("Converter: value is not a int.");
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, string language)
+        {
+            return value is string str && ushort.TryParse(str, out var number) ? number : (ushort)0;
+        }
+    }
+
+    public class IntToShortStringConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, string language)
+        {
+            if (value is int v && v < 65536)
+            {
+                int digit = parameter is string s ? int.Parse(s) : 0;
+                short su = (short)v;
+                float output = su * MathF.Pow(0.1f, digit);
+                string format = "0.";
+                for (int i = 0; i < digit; i++)
+                {
+                    format += "0";
+                }
+                return output.ToString(format);
+            }
+            else
+            {
+                throw new ArgumentException("Converter: value is not a int.");
+            }
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, string language)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
 
 }

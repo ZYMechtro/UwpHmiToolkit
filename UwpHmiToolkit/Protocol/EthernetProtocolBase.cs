@@ -51,22 +51,24 @@ namespace UwpHmiToolkit.Protocol
         /// Try to disconnect a connection, returns true if succeed and returns false if fail.
         /// </summary>
         /// <returns></returns>
-        public abstract Task TryDisconnectAsync(); //override in inherited class
+        public abstract void TryDisconnect(); //override in inherited class
 
         protected virtual async Task<bool> UdpConnect()
         {
-            if (udpSocket == null)
-            {
-                udpSocket = new DatagramSocket();
-                await udpSocket.BindServiceNameAsync(Port);
-            }
-
+            udpSocket = new DatagramSocket();
             try
             {
-                var pair = new EndpointPair(new HostName(GetLocalIp(HostName.CanonicalName)), Port, HostName, Port);
-
-                await udpSocket.ConnectAsync(pair);
-                outputStream = (await udpSocket.GetOutputStreamAsync(HostName, Port)).AsStreamForWrite();
+                var localIp = GetLocalIp(HostName.CanonicalName);
+                if (localIp is null)
+                {
+                    CommunicationError("No cable connections.");
+                    return false;
+                }
+                await udpSocket.ConnectAsync(HostName, Port);
+                lock (udpSocket)
+                {
+                    outputStream = udpSocket.OutputStream.AsStreamForWrite();
+                }
                 return true;
             }
             catch (Exception ex)
@@ -76,13 +78,22 @@ namespace UwpHmiToolkit.Protocol
             }
         }
 
-        protected virtual async Task UdpDisconnect()
+        protected virtual async void UdpDisconnect()
         {
             if (udpSocket != null)
             {
-                await udpSocket.CancelIOAsync();
-                udpSocket?.Dispose();
-                udpSocket = null;
+                try
+                {
+                   await udpSocket.CancelIOAsync();
+                }
+                catch { }
+
+                lock (udpSocket)
+                {
+
+                    udpSocket?.Dispose();
+                    udpSocket = null;
+                }
             }
 
         }
@@ -108,11 +119,18 @@ namespace UwpHmiToolkit.Protocol
 
             if (icp?.NetworkAdapter == null) return null;
             var hns = NetworkInformation.GetHostNames();
+
+            var b = hns.Any(hn =>
+                     hn.Type == HostNameType.Ipv4 &&
+                     hn.IPInformation?.NetworkAdapter != null &&
+                     //hn.IPInformation.NetworkAdapter.NetworkAdapterId == icp.NetworkAdapter.NetworkAdapterId &&
+                     hn.CanonicalName.Contains(match));
+            if (!b) return null;
             var hostname =
                 hns.First(hn =>
                     hn.Type == HostNameType.Ipv4 &&
                     hn.IPInformation?.NetworkAdapter != null &&
-                    hn.IPInformation.NetworkAdapter.NetworkAdapterId == icp.NetworkAdapter.NetworkAdapterId &&
+                    //hn.IPInformation.NetworkAdapter.NetworkAdapterId == icp.NetworkAdapter.NetworkAdapterId &&
                     hn.CanonicalName.Contains(match));
 
             return hostname?.CanonicalName;
@@ -131,7 +149,7 @@ namespace UwpHmiToolkit.Protocol
 
         public ushort Timeout { get; }
 
-        public int SendDelay { get; }
+        public int SendDelay { get; set; }
 
         public bool IsReadonly { get; set; }
 
@@ -143,7 +161,6 @@ namespace UwpHmiToolkit.Protocol
         {
             isOnline = b;
             OnPropertyChanged("IsOnline");
-            devicesToWrite.Clear();
             RaiseOnlineStateChange();
         }
 
@@ -169,6 +186,12 @@ namespace UwpHmiToolkit.Protocol
 
         protected virtual void SetupTimer()
         {
+            if (dispatcherTimer != null)
+            {
+                dispatcherTimer?.Stop();
+                dispatcherTimer.Tick -= DispatcherTimer_Tick;
+            }
+
             dispatcherTimer = new DispatcherTimer() { Interval = new TimeSpan(0, 0, 0, 0, RefreshInterval) };
             dispatcherTimer.Tick += DispatcherTimer_Tick;
         }
@@ -176,6 +199,13 @@ namespace UwpHmiToolkit.Protocol
         protected virtual async void DispatcherTimer_Tick(object sender, object e)
         {
             dispatcherTimer.Stop();
+
+            if (!IsOnline)
+            {
+                TryDisconnect();
+                await Task.Delay(30 * RefreshInterval);
+                await TryConnectAsync();
+            }
 
             if (IsOnline)
                 await CommunicateAsync();
@@ -203,6 +233,12 @@ namespace UwpHmiToolkit.Protocol
 
         public virtual void AddReads(IEnumerable<Device> devices)
         {
+            var result = from device in devices
+                         where device is null
+                         select nameof(device);
+            if (result.Count() > 0)
+                throw new ArgumentNullException();
+
             devicesToMonitor.AddRange(devices.Where(d => !devicesToMonitor.Any(m => m.Name == d.Name)));
 
             needToRefreshReading = true;
@@ -251,6 +287,7 @@ namespace UwpHmiToolkit.Protocol
             this.RefreshInterval = setting.RefreshInterval;
             this.Timeout = setting.Timeout;
             this.CurrentDispatcher = dispatcher;
+            this.SendDelay = setting.SendDelay;
         }
 
         #region DeviceModel
@@ -362,6 +399,7 @@ namespace UwpHmiToolkit.Protocol
         public ushort Timeout { get; set; }
 
         public ushort SendDelay { get; set; }
+
     }
 
 

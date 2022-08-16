@@ -1,6 +1,8 @@
 ﻿using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
+using Windows.UI.Core;
 
 namespace UwpHmiToolkit.ViewModel
 {
@@ -56,5 +58,9 @@ namespace UwpHmiToolkit.ViewModel
         /// Event for property change notifications.
         /// </summary>
         public event PropertyChangedEventHandler PropertyChanged;
+
+        protected CoreDispatcher dispatcher;
+
+        protected async Task UpdateWithUI(DispatchedHandler dispatchedHandler) => await dispatcher.RunAsync(CoreDispatcherPriority.Normal, dispatchedHandler);
     }
 }

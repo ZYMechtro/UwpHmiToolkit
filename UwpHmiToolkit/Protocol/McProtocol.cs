@@ -84,6 +84,10 @@ namespace UwpHmiToolkit.Protocol.McProtocol
                     SetupTimer();
                     this.Start();
                 }
+                else
+                {
+                    return false;
+                }
 
                 return result;
             }
@@ -95,15 +99,14 @@ namespace UwpHmiToolkit.Protocol.McProtocol
 
         }
 
-        public override async Task TryDisconnectAsync()
+        public override void TryDisconnect()
         {
-            this.Stop();
             ChangeOnlineStatus(false);
             if (TransmissionLayerProtocol == TransmissionLayerProtocol.UDP)
             {
                 if (udpSocket != null)
                     udpSocket.MessageReceived -= UdpSocket_MessageReceived;
-                await UdpDisconnect();
+                UdpDisconnect();
             }
             else
             {
@@ -184,12 +187,28 @@ namespace UwpHmiToolkit.Protocol.McProtocol
             else if (devicesToMonitor.Count > 0)
             {
                 if (unhandledSerialIndexPairs.Count > 0)
-                    RaiseCommError($"LostResponseData,count: {unhandledSerialIndexPairs.Count}.");
-                unhandledSerialIndexPairs.Clear();
-                for (int i = 0; i < splitedReadingCmds.Count; i++)
                 {
-                    await SendCommand(AddFrame4E(splitedReadingCmds[i], i));
+                    RaiseCommError($"LostResponseData,count: {unhandledSerialIndexPairs.Count}.");
+                    await Task.Delay(Timeout);
+                    if (unhandledSerialIndexPairs.Count > 0)
+                    {
+                        unhandledSerialIndexPairs.Clear();
+                        ChangeOnlineStatus(false);
+                    }
                 }
+                else
+                {
+                    RaiseCommError("");
+                }
+
+                if (IsOnline)
+                {
+                    for (int i = 0; i < splitedReadingCmds.Count; i++)
+                    {
+                        await SendCommand(AddFrame4E(splitedReadingCmds[i], i)); await Task.Delay(SendDelay);
+                    }
+                }
+
             }
         }
 
@@ -225,7 +244,7 @@ namespace UwpHmiToolkit.Protocol.McProtocol
             {
                 foreach (var b in bitDevices)
                 {
-                    if ((lastType != b.DeviceType && index != 0) || lastChannel != b.Channel)
+                    if ((lastType != b.DeviceType && lastType != "") || lastChannel != b.Channel)
                         index++;
 
                     deviceIndexPairs.Add(b, index);
@@ -349,7 +368,8 @@ namespace UwpHmiToolkit.Protocol.McProtocol
 
                             });
                         }
-                        unhandledSerialIndexPairs.Remove(sN);
+                        lock (unhandledSerialIndexPairs)
+                            unhandledSerialIndexPairs.Remove(sN);
                     }
                     else
                     {
@@ -406,7 +426,6 @@ namespace UwpHmiToolkit.Protocol.McProtocol
             }
             else
             {
-
                 return false;
             }
         }
@@ -421,9 +440,11 @@ namespace UwpHmiToolkit.Protocol.McProtocol
             }
         }
 
+        //TODO: Confirm
         private static IEnumerable<Dictionary<T, int>> SplitDicitionay<T>(Dictionary<T, int> totalDevices, int size = randomReadsMaxCount)
         {
-            for (int i = 0; i <= totalDevices.Max(d => d.Value); i++)
+            var j = totalDevices.Max(d => d.Value) / size;
+            for (int i = 0; i <= j; i++)
             {
                 var devices = from pair in totalDevices
                               where pair.Value >= i * size
@@ -431,7 +452,6 @@ namespace UwpHmiToolkit.Protocol.McProtocol
                               orderby pair.Value
                               select pair;
                 yield return devices.ToDictionary(p => p.Key, p => p.Value);
-                i = devices.Max(d => d.Value);
             }
         }
 
@@ -441,8 +461,15 @@ namespace UwpHmiToolkit.Protocol.McProtocol
         private async Task SendCommand(byte[] request)
         {
             await Task.Delay(SendDelay);
-            await outputStream.WriteAsync(request, 0, request.Length);
-            await outputStream.FlushAsync();
+            try
+            {
+                if (outputStream != null)
+                {
+                    await outputStream.WriteAsync(request, 0, request.Length);
+                    await outputStream.FlushAsync();
+                }
+            }
+            catch { }
         }
 
         private byte[] AddFrame4E(byte[] commandContent) => AddSubHeader(commandContent, null);
@@ -468,7 +495,8 @@ namespace UwpHmiToolkit.Protocol.McProtocol
             if (index is int i)
             {
                 var s = BitConverter.ToUInt16(currentCmdSerialNo, 0);
-                unhandledSerialIndexPairs.Add(s, i);
+                lock (unhandledSerialIndexPairs)
+                    unhandledSerialIndexPairs.Add(s, i);
             }
 
             if (++currentCmdSerialNo[0] == 0)

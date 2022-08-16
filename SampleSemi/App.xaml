@@ -1,0 +1,19 @@
+﻿<Application
+    x:Class="SampleSemi.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:converter="using:UwpHmiToolkit.UiConverter"
+    xmlns:local="using:SampleSemi"
+    RequestedTheme="Light">
+    <Application.Resources>
+        <converter:IntToStringConverter x:Key="IntToStringConverter" />
+        <converter:BoolToStringConverter x:Key="BoolToStringConverter" />
+        <converter:BoolToColorConverter x:Key="BoolToColorConverter" />
+        <converter:IntToDecimalStringConverter x:Key="IntToDecimalStringConverter" />
+        <converter:IntToHexStringConverter x:Key="IntToHexStringConverter" />
+        <converter:IntTypeFloatToStringConverter x:Key="IntTypeFloatToStringConverter" />
+        <converter:IntToVisibilityConverter  x:Key="IntToVisibilityConverter" />
+        <converter:UshortToStringConverter x:Key="UshortToStringConverter"/>
+    </Application.Resources>
+
+</Application>
