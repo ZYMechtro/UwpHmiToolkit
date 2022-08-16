@@ -124,7 +124,7 @@ namespace UwpHmiToolkit.Semi
 
         #endregion /Field
 
-        public static HsmsMessage DataMessagePrimary(byte s, byte f, byte[] text = null, byte? sourceSystemBytes = null)
+        public static HsmsMessage DataMessagePrimary(byte s, byte f, byte[] text, byte? sourceSystemBytes = null)
             => new HsmsMessage(deviceId, (byte)(s | 0b10000000), f, STypes.DataMessage, null, text);
 
         public static HsmsMessage DataMessagePrimary(byte s, byte f, SecsDataBase secsData = null, byte? sourceSystemBytes = null)

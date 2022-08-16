@@ -51,16 +51,11 @@ namespace UwpHmiToolkit.Protocol
         /// Try to disconnect a connection, returns true if succeed and returns false if fail.
         /// </summary>
         /// <returns></returns>
-        public abstract Task TryDisconnectAsync(); //override in inherited class
+        public abstract void TryDisconnect(); //override in inherited class
 
         protected virtual async Task<bool> UdpConnect()
         {
-            if (udpSocket == null)
-            {
-                udpSocket = new DatagramSocket();
-                await udpSocket.BindServiceNameAsync(Port);
-            }
-
+            udpSocket = new DatagramSocket();
             try
             {
                 var localIp = GetLocalIp(HostName.CanonicalName);
@@ -69,10 +64,11 @@ namespace UwpHmiToolkit.Protocol
                     CommunicationError("No cable connections.");
                     return false;
                 }
-                var pair = new EndpointPair(new HostName(localIp), Port, HostName, Port);
-
-                await udpSocket.ConnectAsync(pair);
-                outputStream = (await udpSocket.GetOutputStreamAsync(HostName, Port)).AsStreamForWrite();
+                await udpSocket.ConnectAsync(HostName, Port);
+                lock (udpSocket)
+                {
+                    outputStream = udpSocket.OutputStream.AsStreamForWrite();
+                }
                 return true;
             }
             catch (Exception ex)
@@ -82,13 +78,22 @@ namespace UwpHmiToolkit.Protocol
             }
         }
 
-        protected virtual async Task UdpDisconnect()
+        protected virtual async void UdpDisconnect()
         {
             if (udpSocket != null)
             {
-                await udpSocket.CancelIOAsync();
-                udpSocket?.Dispose();
-                udpSocket = null;
+                try
+                {
+                   await udpSocket.CancelIOAsync();
+                }
+                catch { }
+
+                lock (udpSocket)
+                {
+
+                    udpSocket?.Dispose();
+                    udpSocket = null;
+                }
             }
 
         }
@@ -156,7 +161,6 @@ namespace UwpHmiToolkit.Protocol
         {
             isOnline = b;
             OnPropertyChanged("IsOnline");
-            //devicesToWrite.Clear();
             RaiseOnlineStateChange();
         }
 
@@ -182,6 +186,12 @@ namespace UwpHmiToolkit.Protocol
 
         protected virtual void SetupTimer()
         {
+            if (dispatcherTimer != null)
+            {
+                dispatcherTimer?.Stop();
+                dispatcherTimer.Tick -= DispatcherTimer_Tick;
+            }
+
             dispatcherTimer = new DispatcherTimer() { Interval = new TimeSpan(0, 0, 0, 0, RefreshInterval) };
             dispatcherTimer.Tick += DispatcherTimer_Tick;
         }
@@ -192,16 +202,13 @@ namespace UwpHmiToolkit.Protocol
 
             if (!IsOnline)
             {
-                await this.TryDisconnectAsync();
+                TryDisconnect();
+                await Task.Delay(30 * RefreshInterval);
                 await TryConnectAsync();
             }
 
             if (IsOnline)
                 await CommunicateAsync();
-            else
-            {
-                dispatcherTimer.Interval = new TimeSpan(0, 0, 3);
-            }
 
             dispatcherTimer.Start();
         }

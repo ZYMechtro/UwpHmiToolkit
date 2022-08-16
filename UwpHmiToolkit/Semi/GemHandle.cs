@@ -22,13 +22,13 @@ namespace UwpHmiToolkit.Semi
             else if (CurrentCommunicationState != CommunicationState.Enable_Communicating)
             {
                 if (request.Stream == 9) { }
-                else if (request.Stream == 1 && (request.Function == 13 || request.Function == 14)) { }
+                else if (request.Stream == 1 && (request.Function == 13 || request.Function == 14 || request.Function == 2)) { }
                 else
                     abort = true;
             }
             else if (CurrentControlState != ControlState.Online_Local && CurrentControlState != ControlState.Online_Remote)
             {
-                if (request.Stream == 1 && (request.Function == 13 || request.Function == 17)) { }
+                if (request.Stream == 1 && (request.Function == 13 || request.Function == 17 || request.Function == 2)) { }
                 else
                     abort = true;
             }
@@ -55,7 +55,10 @@ namespace UwpHmiToolkit.Semi
                             case 2: //On Line Data
                                 {
                                     if (CurrentControlState == ControlState.Offline_AttemptOnline)
+                                    {
+                                        SwitchCommState(CommunicationState.Enable_Communicating);
                                         SwitchControlState(ControlState.Online_Local);
+                                    }
                                 }
                                 break;
 
@@ -213,7 +216,7 @@ namespace UwpHmiToolkit.Semi
                                 case 25: //Loopback Diagnostic Request
                                     {
                                         if (request.WBit
-                                            && DecodeSecsII(request.MessageText) is B bs)
+                                            && DecodeSecsII(request.MessageText) is B)
                                             Send(DataMessageSecondary(request, request.MessageText));
                                     }
                                     break;
@@ -263,62 +266,68 @@ namespace UwpHmiToolkit.Semi
                                             && a.GetString.ToUpper() is string cmd)
                                         {
                                             if (CurrentControlState != ControlState.Online_Remote && cmd != "REMOTE" && cmd != "LOCAL")
-                                                break;
-
-                                            switch (cmd)
                                             {
-                                                case "START":
-                                                    if (CurrentProcessingState == ProcessingState.Idle)
-                                                        SwitchProcessState(ProcessingState.Ready);
-                                                    else if (CurrentProcessingState == ProcessingState.Ready)
-                                                        HCACK = 5;
-                                                    else
-                                                        HCACK = 2;
-                                                    break;
-                                                case "STOP":
-                                                    if (CurrentProcessingState == ProcessingState.Ready
-                                                        || CurrentProcessingState == ProcessingState.PauseOnReady)
-                                                        SwitchProcessState(ProcessingState.Idle);
-                                                    else if (CurrentProcessingState == ProcessingState.Idle)
-                                                        HCACK = 5;
-                                                    else
-                                                        HCACK = 2;
-                                                    break;
-                                                case "PAUSE":
-                                                    if (CurrentProcessingState == ProcessingState.Ready)
-                                                        SwitchProcessState(ProcessingState.PauseOnReady);
-                                                    else if (CurrentProcessingState == ProcessingState.PauseOnReady)
-                                                        HCACK = 5;
-                                                    else
-                                                        HCACK = 2;
-                                                    break;
-                                                case "RESUME":
-                                                    if (CurrentProcessingState == ProcessingState.PauseOnReady)
-                                                        SwitchProcessState(ProcessingState.Ready);
-                                                    else if (CurrentProcessingState == ProcessingState.Ready)
-                                                        HCACK = 5;
-                                                    else
-                                                        HCACK = 2;
-                                                    break;
-                                                case "REMOTE":
-                                                    if (CurrentControlState == ControlState.Online_Local)
-                                                        SwitchControlState(ControlState.Online_Remote);
-                                                    else if (CurrentControlState == ControlState.Online_Remote)
-                                                        HCACK = 5;
-                                                    else
-                                                        HCACK = 2;
-                                                    break;
-                                                case "LOCAL":
-                                                    if (CurrentControlState == ControlState.Online_Remote)
-                                                        SwitchControlState(ControlState.Online_Local);
-                                                    else if (CurrentControlState == ControlState.Online_Local)
-                                                        HCACK = 5;
-                                                    else
-                                                        HCACK = 2;
-                                                    break;
-                                                default:
-                                                    HCACK = 1;
-                                                    break;
+                                                abort = true;
+                                                break;
+                                            }
+                                            else
+                                            {
+                                                switch (cmd)
+                                                {
+                                                    case "START":
+                                                        if (CurrentProcessingState == ProcessingState.Idle)
+                                                            SwitchProcessState(ProcessingState.Ready);
+                                                        else if (CurrentProcessingState == ProcessingState.Ready)
+                                                            HCACK = 5;
+                                                        else
+                                                            HCACK = 2;
+                                                        break;
+                                                    case "STOP":
+                                                        if (CurrentProcessingState == ProcessingState.Ready
+                                                            || CurrentProcessingState == ProcessingState.PauseOnReady)
+                                                            SwitchProcessState(ProcessingState.Idle);
+                                                        else if (CurrentProcessingState == ProcessingState.Idle)
+                                                            HCACK = 5;
+                                                        else
+                                                            HCACK = 2;
+                                                        break;
+                                                    case "PAUSE":
+                                                        if (CurrentProcessingState == ProcessingState.Ready)
+                                                            SwitchProcessState(ProcessingState.PauseOnReady);
+                                                        else if (CurrentProcessingState == ProcessingState.PauseOnReady)
+                                                            HCACK = 5;
+                                                        else
+                                                            HCACK = 2;
+                                                        break;
+                                                    case "RESUME":
+                                                        if (CurrentProcessingState == ProcessingState.PauseOnReady)
+                                                            SwitchProcessState(ProcessingState.Ready);
+                                                        else if (CurrentProcessingState == ProcessingState.Ready)
+                                                            HCACK = 5;
+                                                        else
+                                                            HCACK = 2;
+                                                        break;
+                                                    case "REMOTE":
+                                                        if (CurrentControlState == ControlState.Online_Local)
+                                                            SwitchControlState(ControlState.Online_Remote);
+                                                        else if (CurrentControlState == ControlState.Online_Remote)
+                                                            HCACK = 5;
+                                                        else
+                                                            HCACK = 2;
+                                                        break;
+                                                    case "LOCAL":
+                                                        if (CurrentControlState == ControlState.Online_Remote)
+                                                            SwitchControlState(ControlState.Online_Local);
+                                                        else if (CurrentControlState == ControlState.Online_Local)
+                                                            HCACK = 5;
+                                                        else
+                                                            HCACK = 2;
+                                                        break;
+                                                    default:
+                                                        HCACK = 1;
+                                                        break;
+                                                }
+
                                             }
                                         }
                                         else

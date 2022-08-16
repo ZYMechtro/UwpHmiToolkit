@@ -99,14 +99,14 @@ namespace UwpHmiToolkit.Protocol.McProtocol
 
         }
 
-        public override async Task TryDisconnectAsync()
+        public override void TryDisconnect()
         {
             ChangeOnlineStatus(false);
             if (TransmissionLayerProtocol == TransmissionLayerProtocol.UDP)
             {
                 if (udpSocket != null)
                     udpSocket.MessageReceived -= UdpSocket_MessageReceived;
-                await UdpDisconnect();
+                UdpDisconnect();
             }
             else
             {
@@ -461,8 +461,15 @@ namespace UwpHmiToolkit.Protocol.McProtocol
         private async Task SendCommand(byte[] request)
         {
             await Task.Delay(SendDelay);
-            await outputStream.WriteAsync(request, 0, request.Length);
-            await outputStream.FlushAsync();
+            try
+            {
+                if (outputStream != null)
+                {
+                    await outputStream.WriteAsync(request, 0, request.Length);
+                    await outputStream.FlushAsync();
+                }
+            }
+            catch { }
         }
 
         private byte[] AddFrame4E(byte[] commandContent) => AddSubHeader(commandContent, null);

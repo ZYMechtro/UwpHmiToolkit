@@ -6,16 +6,14 @@ using System.Text;
 using System.Threading.Tasks;
 using UwpHmiToolkit.ViewModel;
 using Windows.Networking;
-using System.Net.Sockets;
 using Windows.Networking.Sockets;
-using Windows.Storage.Streams;
 using Windows.UI.Core;
-using System.Net;
 using static UwpHmiToolkit.DataTools.DataTool;
 using System.Threading;
 using static UwpHmiToolkit.Semi.HsmsMessage;
 using static UwpHmiToolkit.Semi.SecsII;
 using Windows.UI.Xaml;
+using System.Net.Sockets;
 
 namespace UwpHmiToolkit.Semi
 {
@@ -26,6 +24,7 @@ namespace UwpHmiToolkit.Semi
         public EquipmentInfo EquipmentInfo { get; set; } = new EquipmentInfo();
 
         protected StreamSocket tcpSocket;
+        protected StreamSocketListener listener;
 
         protected Stream inputStream, outputStream;
 
@@ -94,16 +93,19 @@ namespace UwpHmiToolkit.Semi
         private async Task StartServer()
         {
             tcpSocket?.Dispose();
+            tcpSocket = null;
 
             cts = new CancellationTokenSource();
             try
             {
                 SwitchHsmsState(HsmsState.NotConnected);
                 SwitchCommState(CommunicationState.Enable_WaitCrFromHost);
-                var streamSocketListener = new StreamSocketListener();
-                streamSocketListener.ConnectionReceived += this.StreamSocketListener_ConnectionReceived;
-                streamSocketListener.Control.NoDelay = true;
-                await streamSocketListener.BindServiceNameAsync(HsmsSetting.LocalPort);
+                SwitchControlState(ControlState.Offline_HostOffline);
+                if (listener != null)
+                    listener.ConnectionReceived -= this.StreamSocketListener_ConnectionReceived;
+                listener = new StreamSocketListener();
+                listener.ConnectionReceived += this.StreamSocketListener_ConnectionReceived;
+                await listener.BindServiceNameAsync(HsmsSetting.LocalPort);
 
                 MessageRecord("Server is listening...");
             }
@@ -133,7 +135,6 @@ namespace UwpHmiToolkit.Semi
                     outputStream = tcpSocket.OutputStream.AsStreamForWrite();
 
                     await StartListening();
-
                 }
             }
         }
@@ -145,6 +146,7 @@ namespace UwpHmiToolkit.Semi
                 try
                 {
                     tcpSocket?.Dispose();
+                    tcpSocket = null;
 
                     tcpSocket = new StreamSocket();
                     var targetHost = new HostName(HsmsSetting.TargetIpAddress);
@@ -158,7 +160,8 @@ namespace UwpHmiToolkit.Semi
                         if (CurrentHsmsState == HsmsState.NotConnected)
                         {
                             SwitchHsmsState(HsmsState.NotSelected);
-                            SwitchCommState(CommunicationState.Enable_WaitCra);
+                            SwitchCommState(CommunicationState.Enable_WaitCrFromHost);
+                            SwitchControlState(ControlState.Offline_HostOffline);
                             MessageRecord($"A new connection is established, State: [NotSelected]");
                             messageListToSend.Add(ControlMessagePrimary(STypes.SelectReq));
                         }
@@ -194,145 +197,132 @@ namespace UwpHmiToolkit.Semi
             await UpdateWithUI(() => { SetupTimer(); });
             bool separate = false;
             cts = new CancellationTokenSource();
+            byte[] buffer = new byte[bufferSize];
+
             while (!separate)
             {
-                byte[] buffer = new byte[bufferSize];
-
                 try
                 {
-                    var length = await inputStream.ReadAsync(buffer, 0, bufferSize, cts.Token);
-
-                    if (length > 0)
+                    if (!cts.IsCancellationRequested)
                     {
-                        var source = new byte[length];
-                        Array.Copy(buffer, 0, source, 0, length);
-                        inputStack = bytesQtyWaiting > 0 ? CombineBytes(inputStack, source) : source;
+                        var t = Task.Run(() => CheckToCancelAsync());
+                        var length = await inputStream.ReadAsync(buffer, 0, bufferSize, cts.Token);
 
-                        var messageIsHsms = TryParseHsms(inputStack, out var request, ref bytesQtyWaiting);
-                        if (messageIsHsms)
+                        if (length > 0)
                         {
-                            switch (request.SType)
+                            var source = new byte[length];
+                            Array.Copy(buffer, 0, source, 0, length);
+                            inputStack = bytesQtyWaiting > 0 ? CombineBytes(inputStack, source) : source;
+
+                            var messageIsHsms = TryParseHsms(inputStack, out var request, ref bytesQtyWaiting);
+                            if (messageIsHsms)
                             {
-                                case STypes.SelectReq:
-                                    {
-                                        MessageRecord($"Input : {request.ToSML()}");
-                                        if (CurrentHsmsState == HsmsState.NotSelected)
+                                switch (request.SType)
+                                {
+                                    case STypes.SelectReq:
                                         {
-                                            Send(ControlMessageSecondary(request, STypes.SelectRsp));
-                                            SwitchHsmsState(HsmsState.Selected);
+                                            MessageRecord($"Input : {request.ToSML()}");
+                                            if (CurrentHsmsState == HsmsState.NotSelected)
+                                            {
+                                                Send(ControlMessageSecondary(request, STypes.SelectRsp));
+                                                SwitchHsmsState(HsmsState.Selected);
+                                            }
+                                            else
+                                                Send(RejectControlMessage(request, 1));
                                         }
-                                        else
-                                            Send(RejectControlMessage(request, 1));
-                                    }
-                                    break;
+                                        break;
 
-                                case STypes.SelectRsp:
-                                    {
-                                        MessageRecord($"Input : {request.ToSML()}");
-                                        if (CurrentHsmsState == HsmsState.NotSelected)
+                                    case STypes.SelectRsp:
                                         {
-                                            SwitchHsmsState(HsmsState.Selected);
-                                            SwitchCommState(CommunicationState.Enable_WaitCrFromHost);
+                                            MessageRecord($"Input : {request.ToSML()}");
+                                            if (CurrentHsmsState == HsmsState.NotSelected)
+                                            {
+                                                SwitchHsmsState(HsmsState.Selected);
+                                                SwitchCommState(CommunicationState.Enable_WaitCrFromHost);
+                                            }
+                                            else
+                                                Send(RejectControlMessage(request, 1));
                                         }
-                                        else
-                                            Send(RejectControlMessage(request, 1));
-                                    }
-                                    break;
+                                        break;
 
 
-                                case STypes.LinktestReq:
-                                    {
-                                        MessageRecord($"Input : {request.ToSML()}");
-                                        if (CurrentHsmsState == HsmsState.Selected)
-                                            Send(ControlMessageSecondary(request, STypes.LinktestRsp));
-                                        else
-                                            Send(RejectControlMessage(request, 2));
-                                    }
-                                    break;
-
-                                case STypes.DeselectReq:
-                                    {
-                                        MessageRecord($"Input : {request.ToSML()}");
-                                        if (CurrentHsmsState == HsmsState.Selected)
+                                    case STypes.LinktestReq:
                                         {
-                                            Send(ControlMessageSecondary(request, STypes.DeselectRsp));
-                                            SwitchHsmsState(HsmsState.NotSelected);
+                                            MessageRecord($"Input : {request.ToSML()}");
+                                            if (CurrentHsmsState == HsmsState.Selected)
+                                                Send(ControlMessageSecondary(request, STypes.LinktestRsp));
+                                            else
+                                                Send(RejectControlMessage(request, 2));
                                         }
-                                        else
-                                            Send(RejectControlMessage(request, 3));
-                                    }
-                                    break;
+                                        break;
 
-                                case STypes.DeselectRsp:
-                                    {
-                                        MessageRecord($"Input : {request.ToSML()}");
-                                        if (CurrentHsmsState == HsmsState.Selected)
+                                    case STypes.DeselectReq:
                                         {
-                                            SwitchHsmsState(HsmsState.NotSelected);
+                                            MessageRecord($"Input : {request.ToSML()}");
+                                            if (CurrentHsmsState == HsmsState.Selected)
+                                            {
+                                                Send(ControlMessageSecondary(request, STypes.DeselectRsp));
+                                                SwitchHsmsState(HsmsState.NotSelected);
+                                            }
+                                            else
+                                                Send(RejectControlMessage(request, 3));
                                         }
-                                        else
-                                            Send(RejectControlMessage(request, 3));
-                                    }
-                                    break;
+                                        break;
 
-                                case STypes.SeparateReq:
-                                    {
-                                        MessageRecord($"Input : {request.ToSML()}");
-                                        separate = true;
-                                    }
-                                    break;
+                                    case STypes.DeselectRsp:
+                                        {
+                                            MessageRecord($"Input : {request.ToSML()}");
+                                            if (CurrentHsmsState == HsmsState.Selected)
+                                            {
+                                                SwitchHsmsState(HsmsState.NotSelected);
+                                            }
+                                            else
+                                                Send(RejectControlMessage(request, 3));
+                                        }
+                                        break;
 
-                                case STypes.DataMessage:
-                                    if (bytesQtyWaiting == 0)
-                                    {
-                                        HandleDataMessage(request);
-                                        inputStack = new byte[0];
-                                    }
-                                    break;
+                                    case STypes.SeparateReq:
+                                        {
+                                            MessageRecord($"Input : {request.ToSML()}");
+                                            separate = true;
+                                        }
+                                        break;
 
-                                default: break;
+                                    case STypes.DataMessage:
+                                        if (bytesQtyWaiting == 0)
+                                        {
+                                            HandleDataMessage(request);
+                                            inputStack = new byte[0];
+                                        }
+                                        break;
+
+                                    default: break;
+                                }
+                            }
+                            else
+                            {
+                                bytesQtyWaiting = 0;
+
+                                //Echo
+                                using (StreamWriter writer = new StreamWriter(outputStream))
+                                {
+                                    await writer.WriteLineAsync("Message received is not HSMS message. Bye.");
+                                    MessageRecord($"Input error: {BitConverter.ToString(source)}");
+                                    break;
+                                }
                             }
                         }
-                        else
-                        {
-                            bytesQtyWaiting = 0;
 
-                            //Echo
-                            using (StreamWriter writer = new StreamWriter(outputStream))
-                            {
-                                await writer.WriteLineAsync("Message received is not HSMS message. Bye.");
-                                MessageRecord($"Input error: {BitConverter.ToString(source)}");
-                                break;
-                            }
-                        }
                     }
                     else
-                        await Task.Delay(50);
+                        separate = true;
 
-                    switch (CurrentHsmsState)
-                    {
-                        case HsmsState.NotSelected:
-                            await Task.Delay(HsmsSetting.T7 * 1000);
-                            if (CurrentHsmsState == HsmsState.NotSelected)
-                            {
-                                MessageRecord($"NotSelected timeout (T7), State: [NotConnected]");
-                                SwitchHsmsState(HsmsState.NotConnected);
-                                separate = true;
-                            }
-                            break;
-                        case HsmsState.Selected:
-                            if (waitingReply)
-                            {
-                                await Task.Delay(HsmsSetting.T3 * 1000);
-                                if (waitingReply)
-                                    MessageRecord($"Server wait reply timeout.");
-                            }
-                            break;
-
-                        default:
-                            break;
-                    }
                 }
+                catch (TaskCanceledException tce)
+                {
+                    separate = true;
+                }
+
                 catch (Exception ex)
                 {
                     separate = true;
@@ -349,6 +339,35 @@ namespace UwpHmiToolkit.Semi
                 SwitchControlState(ControlState.Offline_HostOffline);
                 SwitchCommState(CommunicationState.Enable_WaitCrFromHost);
             }
+
+            async Task CheckToCancelAsync()
+            {
+                switch (CurrentHsmsState)
+                {
+                    case HsmsState.NotSelected:
+                        await Task.Delay(HsmsSetting.T7 * 1000);
+                        if (CurrentHsmsState == HsmsState.NotSelected)
+                        {
+                            MessageRecord($"NotSelected timeout (T7), State: [NotConnected]");
+                            SwitchHsmsState(HsmsState.NotConnected);
+                            cts.Cancel();
+                            separate = true;
+                        }
+                        break;
+                    case HsmsState.Selected:
+                        if (waitingReply)
+                        {
+                            await Task.Delay(HsmsSetting.T3 * 1000);
+                            if (waitingReply)
+                                MessageRecord($"Server wait reply timeout.");
+                        }
+                        break;
+
+                    default:
+                        break;
+                }
+
+            }
         }
 
         public void EstablishComm()
@@ -362,7 +381,51 @@ namespace UwpHmiToolkit.Semi
                 info.Items.Add(new A(EquipmentInfo.SOFTREV));
                 messageListToSend.Add(DataMessagePrimary(1, 13, info));
             }
+            else
+            {
+                MessageRecord($"Try establish in incorrect state: {CurrentHsmsState}:{CurrentCommunicationState}");
+            }
 
+        }
+
+        public void ActiveOnline()
+        {
+            if (CurrentHsmsState == HsmsState.Selected
+                && CurrentControlState.ToString().Contains("Offline"))
+            {
+                SwitchControlState(ControlState.Offline_AttemptOnline);
+                messageListToSend.Add(DataMessagePrimary(1, 1));
+            }
+            else
+            {
+                MessageRecord($"Try online in incorrect state: {CurrentHsmsState}::{CurrentControlState}");
+            }
+        }
+
+        public void ActiveRemote()
+        {
+            if (CurrentHsmsState == HsmsState.Selected
+                && CurrentControlState.ToString().Contains("Online"))
+            {
+                SwitchControlState(ControlState.Online_Remote);
+            }
+            else
+            {
+                MessageRecord($"Try online in incorrect state: {CurrentHsmsState}::{CurrentControlState}");
+            }
+        }
+
+        public void ActiveLocal()
+        {
+            if (CurrentHsmsState == HsmsState.Selected
+                && CurrentControlState.ToString().Contains("Online"))
+            {
+                SwitchControlState(ControlState.Online_Local);
+            }
+            else
+            {
+                MessageRecord($"Try online in incorrect state: {CurrentHsmsState}::{CurrentControlState}");
+            }
         }
 
         public void SeperateReq()
@@ -412,7 +475,7 @@ namespace UwpHmiToolkit.Semi
                         //waitingReply = true;
                     }
                 }
-                catch (OperationCanceledException oce)
+                catch (TaskCanceledException oce)
                 {
                     MessageRecord(string.Format($"Sending be cancelled..."));
 
@@ -457,7 +520,7 @@ namespace UwpHmiToolkit.Semi
             for (int i = 0; i < messageListToSend.Count; i++)
             {
                 Send(messageListToSend[i]);
-                Task.Delay(100);
+                Task.Delay(200);
             }
             messageListToSend.Clear();
             timer.Start();

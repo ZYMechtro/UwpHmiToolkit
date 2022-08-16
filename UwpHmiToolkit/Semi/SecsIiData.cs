@@ -28,7 +28,7 @@ namespace UwpHmiToolkit.Semi
             U4 = 0b1011_00,
         }
 
-        public static byte[] EncodeSecsII(SecsDataBase secsData) => secsData.Encode.ToArray();
+        public static byte[] EncodeSecsII(SecsDataBase secsData) => secsData is null ? null : secsData.Encode.ToArray();
 
         private static SecsDataBase DecodeSecsII(byte[] bytes, ref int index)
         {
