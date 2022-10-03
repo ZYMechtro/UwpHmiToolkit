@@ -125,7 +125,7 @@ namespace UwpHmiToolkit.UiConverter
     {
         public object Convert(object value, Type targetType, object parameter, string language)
         {
-            return value is ushort i ? i.ToString() : throw new ArgumentException("Converter: value is not a int.");
+            return value is ushort i ? i.ToString() : throw new ArgumentException("Converter: value is not a ushort.");
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, string language)
@@ -152,13 +152,40 @@ namespace UwpHmiToolkit.UiConverter
             }
             else
             {
-                throw new ArgumentException("Converter: value is not a int.");
+                throw new ArgumentException("Converter: value is not a short.");
             }
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, string language)
         {
             throw new NotImplementedException();
+        }
+    }
+
+    public class DoubleToStringConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, string language)
+        {
+            return value is double i ? i.ToString() : throw new ArgumentException("Converter: value is not a double.");
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, string language)
+        {
+            return value is string str && double.TryParse(str, out var number) ? number : 0;
+        }
+    }
+
+
+    public class FloatToStringConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, string language)
+        {
+            return value is float i ? i.ToString() : throw new ArgumentException("Converter: value is not a double.");
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, string language)
+        {
+            return value is string str && float.TryParse(str, out var number) ? number : 0;
         }
     }
 

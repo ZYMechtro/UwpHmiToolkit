@@ -147,16 +147,20 @@ namespace UwpHmiToolkit.Protocol.McProtocol
                     var splited = new List<List<DeviceToWrite>> { current };
                     Type lastType = null;
                     string lastDeviceName = "";
-                    foreach (var dw in devicesToWrite)
+
+                    lock (devicesToWrite)
                     {
-                        if (lastType != null && (dw.Device.GetType() != lastType || dw.Device.Name == lastDeviceName))
+                        foreach (var dw in devicesToWrite)
                         {
-                            current = new List<DeviceToWrite>();
-                            splited.Add(current);
+                            if (lastType != null && (dw.Device.GetType() != lastType || dw.Device.Name == lastDeviceName))
+                            {
+                                current = new List<DeviceToWrite>();
+                                splited.Add(current);
+                            }
+                            current.Add(dw);
+                            lastType = dw.Device.GetType();
+                            lastDeviceName = dw.Device.Name;
                         }
-                        current.Add(dw);
-                        lastType = dw.Device.GetType();
-                        lastDeviceName = dw.Device.Name;
                     }
 
                     foreach (var list in splited)
