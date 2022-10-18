@@ -467,7 +467,7 @@ namespace UwpHmiToolkit.Semi
                             await outputStream.FlushAsync(cts.Token);
                             lastSentMessage = hsmsMessage;
                             sended = true;
-                            MessageRecord(string.Format($"Sent : " + hsmsMessage.ToSML()));
+                            MessageRecord($"Sent : " + hsmsMessage.ToSML());
                         }
                     }
                     if (hsmsMessage.WBit)
@@ -477,12 +477,12 @@ namespace UwpHmiToolkit.Semi
                 }
                 catch (TaskCanceledException oce)
                 {
-                    MessageRecord(string.Format($"Sending be cancelled..."));
+                    MessageRecord($"Sending be cancelled...");
 
                 }
                 catch (Exception ex)
                 {
-                    MessageRecord(string.Format($"Send fail..."));
+                    MessageRecord($"Send fail...");
                 }
                 finally
                 {
@@ -494,7 +494,7 @@ namespace UwpHmiToolkit.Semi
         public delegate void ServerMessageHandler(string message);
         public event ServerMessageHandler MessageRecord;
 
-        public delegate HsmsMessage GotMessageNeedsReplyHandler(HsmsMessage request);
+        public delegate void GotMessageNeedsReplyHandler(HsmsMessage request);
         public event GotMessageNeedsReplyHandler GotDataMessage;
 
         DispatcherTimer timer;
