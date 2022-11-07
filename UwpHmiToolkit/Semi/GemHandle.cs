@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using Windows.Media.Capture.Core;
@@ -691,23 +692,33 @@ namespace UwpHmiToolkit.Semi
                 CEID = new U4(ceid);
             }
 
-            public L GetL()
+            public L GetL(uint? reportId = null, L report = null)
             {
                 var list = new L();
                 DATAID.Items[0]++;
                 list.Items.Add(DATAID); //DATAID
                 list.Items.Add(CEID);
-                list.Items.Add(new L()); //Add empty list for reports (RPTID, VID, V)
+                var l1 = new L();
+                if (reportId != null && report is L reportList)
+                {
+                    var l2 = new L();
+                    var rptid = new U4(1);
+                    l2.Items.Add(rptid);
+                    l2.Items.Add(reportList);
+                    l1.Items.Add(l2);
+                }
+                list.Items.Add(l1);
                 return list;
             }
         }
 
-        public void SendEventReport(uint ceid)
+        public void SendEventReport(uint ceid, uint? reportId = null, L reportL = null)
         {
             if (CurrentCommunicationState == CommunicationState.Enable_Communicating)
                 if (Events.FirstOrDefault(ev => ev.CEID.Items[0] == ceid) is GemEvent e
                     && e.CEED.Items[0] > 0)
-                    messageListToSend.Add(DataMessagePrimary(6, 11, e.GetL()));
+                    messageListToSend.Add(DataMessagePrimary(6, 11, e.GetL(reportId, reportL)));
+
         }
 
         #endregion /Event
