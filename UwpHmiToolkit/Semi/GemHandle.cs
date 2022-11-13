@@ -712,12 +712,19 @@ namespace UwpHmiToolkit.Semi
             }
         }
 
-        public void SendEventReport(uint ceid, uint? reportId = null, L reportL = null)
+        public void SendEventReport(uint ceid, uint? reportId = null, L reportL = null, bool forceLog = false)
         {
-            if (CurrentCommunicationState == CommunicationState.Enable_Communicating)
+            var communicating = CurrentCommunicationState == CommunicationState.Enable_Communicating;
+            if (communicating || forceLog)
                 if (Events.FirstOrDefault(ev => ev.CEID.Items[0] == ceid) is GemEvent e
                     && e.CEED.Items[0] > 0)
-                    messageListToSend.Add(DataMessagePrimary(6, 11, e.GetL(reportId, reportL)));
+                {
+                    var msg = DataMessagePrimary(6, 11, e.GetL(reportId, reportL));
+                    if (communicating)
+                        messageListToSend.Add(msg);
+                    else if (forceLog)
+                        MessageRecord("Record Event : " + msg.ToSML());
+                }
 
         }
 
