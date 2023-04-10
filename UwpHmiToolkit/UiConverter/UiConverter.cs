@@ -89,6 +89,34 @@ namespace UwpHmiToolkit.UiConverter
         }
     }
 
+    public class IntToSigned16StringConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, string language)
+        {
+            if (value is int u )
+            {
+                var v = (short)u;
+                int digit = parameter is string s ? int.Parse(s) : 0;
+                float output = v * MathF.Pow(0.1f, digit);
+                string format = "0.";
+                for (int i = 0; i < digit; i++)
+                {
+                    format += "0";
+                }
+                return output.ToString(format);
+            }
+            else
+            {
+                throw new ArgumentException("Converter: value is not a int.");
+            }
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, string language)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
     public class IntTypeFloatToStringConverter : IValueConverter
     {
         public object Convert(object value, Type targetType, object parameter, string language)
