@@ -89,6 +89,34 @@ namespace UwpHmiToolkit.UiConverter
         }
     }
 
+    public class IntToSigned16StringConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, string language)
+        {
+            if (value is int u )
+            {
+                var v = (short)u;
+                int digit = parameter is string s ? int.Parse(s) : 0;
+                float output = v * MathF.Pow(0.1f, digit);
+                string format = "0.";
+                for (int i = 0; i < digit; i++)
+                {
+                    format += "0";
+                }
+                return output.ToString(format);
+            }
+            else
+            {
+                throw new ArgumentException("Converter: value is not a int.");
+            }
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, string language)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
     public class IntTypeFloatToStringConverter : IValueConverter
     {
         public object Convert(object value, Type targetType, object parameter, string language)
@@ -125,7 +153,7 @@ namespace UwpHmiToolkit.UiConverter
     {
         public object Convert(object value, Type targetType, object parameter, string language)
         {
-            return value is ushort i ? i.ToString() : throw new ArgumentException("Converter: value is not a int.");
+            return value is ushort i ? i.ToString() : throw new ArgumentException("Converter: value is not a ushort.");
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, string language)
@@ -152,13 +180,40 @@ namespace UwpHmiToolkit.UiConverter
             }
             else
             {
-                throw new ArgumentException("Converter: value is not a int.");
+                throw new ArgumentException("Converter: value is not a short.");
             }
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, string language)
         {
             throw new NotImplementedException();
+        }
+    }
+
+    public class DoubleToStringConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, string language)
+        {
+            return value is double i ? i.ToString() : throw new ArgumentException("Converter: value is not a double.");
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, string language)
+        {
+            return value is string str && double.TryParse(str, out var number) ? number : 0;
+        }
+    }
+
+
+    public class FloatToStringConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, string language)
+        {
+            return value is float i ? i.ToString() : throw new ArgumentException("Converter: value is not a double.");
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, string language)
+        {
+            return value is string str && float.TryParse(str, out var number) ? number : 0;
         }
     }
 

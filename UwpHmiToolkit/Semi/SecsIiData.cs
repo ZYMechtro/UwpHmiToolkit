@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Windows.UI.Xaml.Controls.Primitives;
 using static UwpHmiToolkit.DataTools.DataTool;
 
 namespace UwpHmiToolkit.Semi
@@ -612,6 +613,16 @@ namespace UwpHmiToolkit.Semi
         public abstract class SecsData<T> : SecsDataBase
         {
             public abstract List<T> Items { get; set; }
+
+            public virtual object GetItem(int index)
+            {
+                if (Items.ElementAtOrDefault(index) != null)
+                    return Items[index];
+                else
+                    return null;
+            }
+
+            public virtual int Count => Items.Count;
         }
 
         public class L : SecsData<SecsDataBase>
@@ -671,7 +682,7 @@ namespace UwpHmiToolkit.Semi
             public override List<byte> ValueInBytes
                 => Encoding.ASCII.GetBytes(new string(Items.ToArray())).ToList();
 
-            public string GetString => new string(Items.ToArray());
+            public string GetString => !IsEmpty ? new string(Items.ToArray()) : null;
 
             public A(string str)
             {

@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using Windows.Media.Capture.Core;
 using Windows.Services.Maps;
@@ -10,6 +12,7 @@ namespace UwpHmiToolkit.Semi
     public partial class Gem
     {
         const byte onByte = 128, offByte = 0;
+        public bool PpGranted;
 
         private void HandleDataMessage(HsmsMessage request)
         {
@@ -71,7 +74,7 @@ namespace UwpHmiToolkit.Semi
                                         var l = new L();
                                         if (list.IsEmpty)
                                         {
-                                            foreach (var sv in Statuses)
+                                            foreach (var sv in Svs)
                                             {
                                                 l.Items.Add(sv.Data);
                                             }
@@ -85,7 +88,7 @@ namespace UwpHmiToolkit.Semi
                                             }
                                             foreach (var svid in svids)
                                             {
-                                                var match = Statuses.FirstOrDefault(sv => sv.SVID.Items[0] == svid);
+                                                var match = Svs.FirstOrDefault(sv => sv.SVID.Items[0] == svid);
                                                 if (match is null)
                                                 {
                                                     abort = true;
@@ -111,7 +114,7 @@ namespace UwpHmiToolkit.Semi
                                         var l = new L();
                                         if (list.IsEmpty) //List all
                                         {
-                                            foreach (var sv in Statuses)
+                                            foreach (var sv in Svs)
                                             {
                                                 l.Items.Add(sv.GetL());
                                             }
@@ -127,7 +130,7 @@ namespace UwpHmiToolkit.Semi
                                             }
                                             foreach (var svid in svids)
                                             {
-                                                var match = Statuses.FirstOrDefault(sv => sv.SVID.Items[0] == svid);
+                                                var match = Svs.FirstOrDefault(sv => sv.SVID.Items[0] == svid);
                                                 if (match is null)
                                                 {
                                                     abort = true;
@@ -258,6 +261,7 @@ namespace UwpHmiToolkit.Semi
 
                                 case 41: //Host Command Send
                                     {
+                                        bool cmdHandling = false;
                                         byte HCACK = 0;
                                         if (DecodeSecsII(request.MessageText) is L list
                                             && !list.IsEmpty
@@ -323,6 +327,16 @@ namespace UwpHmiToolkit.Semi
                                                         else
                                                             HCACK = 2;
                                                         break;
+
+                                                    case "PP-SELECT":
+                                                        if (CurrentProcessingState == ProcessingState.Idle)
+                                                        {
+                                                            cmdHandling = true;
+                                                            GotDataMessage(request);
+                                                        }
+                                                        else
+                                                            HCACK = 2;
+                                                        break;
                                                     default:
                                                         HCACK = 1;
                                                         break;
@@ -335,7 +349,8 @@ namespace UwpHmiToolkit.Semi
                                             HCACK = 1;
                                         }
 
-                                        Send(DataMessageSecondary(request, RcmdReply(HCACK)));
+                                        if (!cmdHandling)
+                                            Send(DataMessageSecondary(request, RcmdReply(HCACK)));
                                     }
                                     break;
 
@@ -473,7 +488,7 @@ namespace UwpHmiToolkit.Semi
                                             && u4.Items[0] is uint ceid
                                             && Events.FirstOrDefault(ev => ev.CEID.Items[0] == ceid) is GemEvent e)
                                         {
-                                            Send(DataMessagePrimary(6, 16, e.GetL()));
+                                            Send(DataMessageSecondary(request, e.GetL()));
                                         }
                                         else abort = true;
                                     }
@@ -489,66 +504,80 @@ namespace UwpHmiToolkit.Semi
                         {
                             switch (request.Function)
                             {
-                                case 1:
+                                case 1: //Process Program Load Inquire
                                     {
-
+                                        if (DecodeSecsII(request.MessageText) is L list
+                                             && !list.IsEmpty
+                                             && list.Items[0] is A ppid)
+                                        {
+                                            Send(DataMessageSecondary(request, new B(0))); //Always grant ok.
+                                        }
+                                        else abort = true;
                                     }
                                     break;
 
-                                case 2:
+                                case 2: //Process Program Load Grant
                                     {
-
-                                    }
-                                    break;
-
-
-                                case 3:
-                                    {
-
-                                    }
-                                    break;
-
-                                case 4:
-                                    {
-
-                                    }
-                                    break;
-
-
-                                case 5:
-                                    {
-
-                                    }
-                                    break;
-
-                                case 6:
-                                    {
-
+                                        if (DecodeSecsII(request.MessageText) is B gnt
+                                             && !gnt.IsEmpty
+                                             && gnt.Items[0] is byte grant)
+                                        {
+                                            if (grant == 0)
+                                                PpGranted = true;
+                                            else
+                                                PpGranted = false;
+                                        }
                                     }
                                     break;
 
 
-                                case 17:
+                                case 3: //Process Program Send
                                     {
-
+                                        GotDataMessage(request);
                                     }
                                     break;
 
-                                case 19:
+                                case 4: //Process Program Send Acknowledge
                                     {
-
+                                        GotDataMessage(request);
                                     }
                                     break;
 
-                                case 23:
-                                    {
 
+                                case 5: //Process Program Request
+                                    {
+                                        GotDataMessage(request);
                                     }
                                     break;
 
-                                case 25:
+                                case 6: //Process Program Data
                                     {
+                                        GotDataMessage(request);
+                                    }
+                                    break;
 
+
+                                case 17: //Delete Process Program Send
+                                    {
+                                        GotDataMessage(request);
+                                    }
+                                    break;
+
+                                case 19: //Current Process Program Dir Request
+                                    {
+                                        GotDataMessage(request);
+                                    }
+                                    break;
+
+                                case 23: //Formatted Process Program Send
+                                    {
+                                        GotDataMessage(request);
+                                    }
+                                    break;
+
+                                case 25: //Formatted Process Program Request
+                                    {
+                                        GotDataMessage(request);
                                     }
                                     break;
 
@@ -568,19 +597,37 @@ namespace UwpHmiToolkit.Semi
                 Send(DataMessageAbort(request));
         }
 
-        public byte[] RcmdReply(byte hcack)
+        /// <summary>
+        /// 0 = Acknowledge, command has been performed
+        /// 1 = Command does not exist
+        /// 2 = Can not perform now
+        /// 3 = At least one parameter is invalid
+        /// 4 = Acknowledge, command will be performed with completion signaled
+        /// later by an event
+        /// 5 = Rejected, Already in Desired Condition
+        /// 6 = No such object exists
+        /// </summary>
+        /// <param name="hcack"></param>
+        /// <param name="secsDatas"></param>
+        /// <returns></returns>
+        public byte[] RcmdReply(byte hcack, List<SecsDataBase> secsDatas = null)
         {
             var l = new L();
             var l2 = new L();
             l.Items.Add(new B(hcack));
             l.Items.Add(l2);
+            if (secsDatas != null)
+            {
+                foreach (var item in secsDatas)
+                    l2.Items.Add(item);
+            }
             return EncodeSecsII(l);
         }
 
 
         #region Status
 
-        public List<GemStatus> Statuses = new List<GemStatus>();
+        public List<GemStatus> Svs = new List<GemStatus>();
 
         public class GemStatus
         {
@@ -645,23 +692,40 @@ namespace UwpHmiToolkit.Semi
                 CEID = new U4(ceid);
             }
 
-            public L GetL()
+            public L GetL(uint? reportId = null, L report = null)
             {
                 var list = new L();
                 DATAID.Items[0]++;
                 list.Items.Add(DATAID); //DATAID
                 list.Items.Add(CEID);
-                list.Items.Add(new L()); //Add empty list for reports (RPTID, VID, V)
+                var l1 = new L();
+                if (reportId != null && report is L reportList)
+                {
+                    var l2 = new L();
+                    var rptid = new U4(1);
+                    l2.Items.Add(rptid);
+                    l2.Items.Add(reportList);
+                    l1.Items.Add(l2);
+                }
+                list.Items.Add(l1);
                 return list;
             }
         }
 
-        public void SendEventReport(uint ceid)
+        public void SendEventReport(uint ceid, uint? reportId = null, L reportL = null, bool forceLog = false)
         {
-            if (CurrentCommunicationState == CommunicationState.Enable_Communicating)
+            var communicating = CurrentCommunicationState == CommunicationState.Enable_Communicating;
+            if (communicating || forceLog)
                 if (Events.FirstOrDefault(ev => ev.CEID.Items[0] == ceid) is GemEvent e
                     && e.CEED.Items[0] > 0)
-                    messageListToSend.Add(DataMessagePrimary(6, 11, e.GetL()));
+                {
+                    var msg = DataMessagePrimary(6, 11, e.GetL(reportId, reportL));
+                    if (communicating)
+                        messageListToSend.Add(msg);
+                    else if (forceLog)
+                        MessageRecord("Record Event : " + msg.ToSML());
+                }
+
         }
 
         #endregion /Event
@@ -764,6 +828,17 @@ namespace UwpHmiToolkit.Semi
         }
 
         #endregion /Alarm
+
+        #region PP
+
+        public void SendPpMessage(HsmsMessage msg)
+        {
+            if (CurrentCommunicationState == CommunicationState.Enable_Communicating)
+                if (msg.Stream == 7)
+                    messageListToSend.Add(msg);
+        }
+
+        #endregion /PP
 
     }
 }
