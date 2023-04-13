@@ -1,3 +1,6 @@
+# Uwp Is Dead
+https://developercommunity.visualstudio.com/t/Add-NET-678-support-to-UWP/1596483
+
 # UwpHmiToolkit
 A toolkit for UWP apps as a HMI (Human Machine Interface) or a client/server between industrial machines.
 
