@@ -84,7 +84,7 @@ namespace UwpHmiToolkit.Protocol
             {
                 try
                 {
-                   await udpSocket.CancelIOAsync();
+                    await udpSocket.CancelIOAsync();
                 }
                 catch { }
 
@@ -208,7 +208,7 @@ namespace UwpHmiToolkit.Protocol
             }
 
             if (IsOnline)
-                await CommunicateAsync();
+                    await CommunicateAsync();
 
             dispatcherTimer.Start();
         }

@@ -114,6 +114,9 @@ namespace UwpHmiToolkit.Protocol.McProtocol
             }
         }
 
+
+        public bool Writing { get; private set; } = false;
+
         public override async Task CommunicateAsync()
         {
             //Writing Actions
@@ -143,6 +146,7 @@ namespace UwpHmiToolkit.Protocol.McProtocol
 
                 if (devicesToWrite.Count > 0)
                 {
+                    this.Writing = true;
                     var current = new List<DeviceToWrite>();
                     var splited = new List<List<DeviceToWrite>> { current };
                     Type lastType = null;
@@ -168,9 +172,10 @@ namespace UwpHmiToolkit.Protocol.McProtocol
                         await SendCommand(AddFrame4E(RandomWrite(list)));
                     }
                     devicesToWrite.Clear();
+                    Writing = false;
                 }
             }
-            else if (IsReadonly)
+            else
             {
                 devicesToWrite.Clear();
             }
