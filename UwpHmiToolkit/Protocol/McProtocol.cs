@@ -151,17 +151,21 @@ namespace UwpHmiToolkit.Protocol.McProtocol
                     var splited = new List<List<DeviceToWrite>> { current };
                     Type lastType = null;
                     string lastDeviceName = "";
-
+                    int countDevicesOneList = 0;
                     lock (devicesToWrite)
                     {
                         foreach (var dw in devicesToWrite)
                         {
-                            if (lastType != null && (dw.Device.GetType() != lastType || dw.Device.Name == lastDeviceName))
+                            if (lastType != null
+                                && (dw.Device.GetType() != lastType || dw.Device.Name == lastDeviceName)
+                                || countDevicesOneList >= randomWritesMaxCount)
                             {
                                 current = new List<DeviceToWrite>();
                                 splited.Add(current);
+                                countDevicesOneList = 0;
                             }
                             current.Add(dw);
+                            countDevicesOneList++;
                             lastType = dw.Device.GetType();
                             lastDeviceName = dw.Device.Name;
                         }
@@ -440,6 +444,7 @@ namespace UwpHmiToolkit.Protocol.McProtocol
         }
 
         private const int randomReadsMaxCount = 192;
+        private const int randomWritesMaxCount = 100;
 
         private static IEnumerable<List<T>> SplitList<T>(List<T> devices, int size = randomReadsMaxCount)
         {
